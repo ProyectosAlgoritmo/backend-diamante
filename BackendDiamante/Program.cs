@@ -110,7 +110,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// HTTPS solo en producción — localmente no hay certificado configurado
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
+
 app.UseRateLimiter();
 app.UseCors("AllowAll");
 app.UseAuthentication();
@@ -127,7 +130,10 @@ static async Task SeedDefaultUsersAsync(WebApplication app)
 
     try
     {
-        await context.Database.MigrateAsync();
+        // EnsureCreated: crea las tablas si no existen (sin necesitar migraciones).
+        // Si prefieres gestionar el schema con Scripts/schema.sql, esta línea
+        // solo actúa como red de seguridad cuando las tablas aún no existen.
+        await context.Database.EnsureCreatedAsync();
 
         if (!await context.Users.AnyAsync())
         {
