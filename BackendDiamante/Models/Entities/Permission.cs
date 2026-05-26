@@ -3,21 +3,19 @@ using System.Collections.Generic;
 
 namespace BackendDiamante.Models.Entities;
 
-public partial class Role
+public partial class Permission
 {
     public int Id { get; set; }
 
     public string Name { get; set; } = null!;
 
-    public string? Description { get; set; }
+    public string Code { get; set; } = null!;
 
-    public bool IsActive { get; set; }
+    public int SubmoduleId { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
-    public DateTime? UpdatedAt { get; set; }
-
-    public DateTime? DeletedAt { get; set; }
-
     public virtual ICollection<RolePermission> RolePermissions { get; set; } = new List<RolePermission>();
+
+    public virtual Submodule Submodule { get; set; } = null!;
 }
