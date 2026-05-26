@@ -9,4 +9,10 @@ public interface IAuthLogic
     Task LogoutAsync(string token, string ipAddress);
     Task<UserInfoResponse?> GetCurrentUserAsync(int userId);
     Task<LoginResponse> GoogleLoginAsync(string accessToken, string ipAddress);
+    Task<LoginResponse> MicrosoftLoginAsync(string accessToken, string ipAddress);
+
+    // ─── Password Recovery ───────────────────────────────────────────────────
+    Task ForgotPasswordAsync(string email, string frontendBaseUrl);
+    Task<ValidateResetTokenResponse> ValidateResetTokenAsync(string token);
+    Task ResetPasswordAsync(string token, string newPassword);
 }

@@ -92,7 +92,37 @@ ELSE
 GO
 
 -- ──────────────────────────────────────────────────────────────
---  4. SEED — usuarios de prueba
+--  4. PASSWORD RESET TOKENS
+-- ──────────────────────────────────────────────────────────────
+IF OBJECT_ID(N'dbo.PasswordResetTokens', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.PasswordResetTokens (
+        Id          INT            NOT NULL IDENTITY(1,1),
+        Token       NVARCHAR(200)  NOT NULL,
+        ExpiresAt   DATETIME2      NOT NULL,
+        IsUsed      BIT            NOT NULL CONSTRAINT DF_PRT_IsUsed    DEFAULT (0),
+        CreatedAt   DATETIME2      NOT NULL CONSTRAINT DF_PRT_CreatedAt DEFAULT (GETUTCDATE()),
+        UsedAt      DATETIME2          NULL,
+        UserId      INT            NOT NULL,
+
+        CONSTRAINT PK_PasswordResetTokens PRIMARY KEY (Id),
+
+        CONSTRAINT FK_PasswordResetTokens_Users_UserId
+            FOREIGN KEY (UserId) REFERENCES dbo.Users (Id)
+            ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE INDEX IX_PasswordResetTokens_Token  ON dbo.PasswordResetTokens (Token);
+    CREATE        INDEX IX_PasswordResetTokens_UserId ON dbo.PasswordResetTokens (UserId);
+
+    PRINT 'Tabla PasswordResetTokens creada.';
+END
+ELSE
+    PRINT 'Tabla PasswordResetTokens ya existe, se omite.';
+GO
+
+-- ──────────────────────────────────────────────────────────────
+--  5. SEED — usuarios de prueba
 --     Los hashes son BCrypt work factor 12.
 --     admin@diamante.co      → Admin123!
 --     supervisor@diamante.co → Super123!

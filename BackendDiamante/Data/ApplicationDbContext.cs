@@ -20,8 +20,9 @@ public partial class ApplicationDbContext : DbContext
     public virtual DbSet<Submodule>      Submodules      { get; set; }
 
     // ─── Auth (new dev) ───────────────────────────────────────────────────────
-    public DbSet<User>         Users         { get; set; }
-    public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<User>               Users              { get; set; }
+    public DbSet<RefreshToken>       RefreshTokens      { get; set; }
+    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -115,6 +116,21 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             entity.HasOne(e => e.User)
                   .WithMany(u => u.RefreshTokens)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ─── PasswordResetTokens ─────────────────────────────────────────────
+        modelBuilder.Entity<PasswordResetToken>(entity =>
+        {
+            entity.ToTable("PasswordResetTokens");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Token).IsRequired().HasMaxLength(200);
+            entity.HasIndex(e => e.Token).IsUnique();
+            entity.Property(e => e.IsUsed).HasDefaultValue(false);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.User)
+                  .WithMany(u => u.PasswordResetTokens)
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });

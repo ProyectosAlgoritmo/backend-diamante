@@ -18,12 +18,21 @@ public class AuthLogic : IAuthLogic
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _config;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<AuthLogic> _logger;
 
-    public AuthLogic(ApplicationDbContext context, IConfiguration config, IHttpClientFactory httpClientFactory)
+    public AuthLogic(
+        ApplicationDbContext context,
+        IConfiguration config,
+        IHttpClientFactory httpClientFactory,
+        IEmailService emailService,
+        ILogger<AuthLogic> logger)
     {
         _context = context;
         _config = config;
         _httpClientFactory = httpClientFactory;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     // ─── Modelo interno para deserializar respuesta de Google userinfo ────────
@@ -166,12 +175,208 @@ public class AuthLogic : IAuthLogic
         return BuildLoginResponse(accessToken, refreshToken, user);
     }
 
+    // ─── Microsoft Login ───────────────────────────────────────────────────────
+
+    /// <summary>Modelo interno para deserializar respuesta de Microsoft Graph /me</summary>
+    private sealed record MicrosoftUserInfo(
+        string? Id,
+        string? DisplayName,
+        string? Mail,
+        string? UserPrincipalName
+    );
+
+    public async Task<LoginResponse> MicrosoftLoginAsync(string microsoftAccessToken, string ipAddress)
+    {
+        MicrosoftUserInfo? userInfo;
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", microsoftAccessToken);
+
+            var response = await client.GetAsync("https://graph.microsoft.com/v1.0/me");
+
+            if (!response.IsSuccessStatusCode)
+                throw new UnauthorizedAccessException("Token de Microsoft invalido o expirado");
+
+            var json = await response.Content.ReadAsStringAsync();
+            userInfo = JsonSerializer.Deserialize<MicrosoftUserInfo>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw;
+        }
+        catch
+        {
+            throw new UnauthorizedAccessException("No se pudo verificar el token de Microsoft");
+        }
+
+        // Microsoft Graph: email puede estar en Mail o UserPrincipalName
+        var email = userInfo?.Mail ?? userInfo?.UserPrincipalName;
+
+        if (userInfo is null || string.IsNullOrEmpty(email))
+            throw new UnauthorizedAccessException("Token de Microsoft no contiene informacion de usuario");
+
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+
+        if (user is null)
+        {
+            user = new User
+            {
+                Email = email,
+                Name = userInfo.DisplayName ?? email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()),
+                Role = "cliente",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+            };
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+        }
+
+        if (!user.IsActive)
+            throw new UnauthorizedAccessException("Tu cuenta esta desactivada. Contacta al administrador.");
+
+        user.LastLoginAt = DateTime.UtcNow;
+
+        var accessToken = GenerateAccessToken(user);
+        var refreshToken = GenerateRefreshToken(user.Id, ipAddress);
+        _context.RefreshTokens.Add(refreshToken);
+        await _context.SaveChangesAsync();
+
+        return BuildLoginResponse(accessToken, refreshToken, user);
+    }
+
     // ─── Get Current User ─────────────────────────────────────────────────────
 
     public async Task<UserInfoResponse?> GetCurrentUserAsync(int userId)
     {
         var user = await _context.Users.FindAsync(userId);
         return user is null ? null : MapToUserInfo(user);
+    }
+
+    // ─── Forgot Password ──────────────────────────────────────────────────────
+
+    public async Task ForgotPasswordAsync(string email, string frontendBaseUrl)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower().Trim());
+
+        // No revelar si el correo existe o no (anti-enumeracion)
+        if (user is null || !user.IsActive)
+        {
+            _logger.LogInformation("Solicitud de recuperacion para correo inexistente o inactivo: {Email}", email);
+            return;
+        }
+
+        // Invalidar tokens previos no usados del mismo usuario
+        var previousTokens = await _context.PasswordResetTokens
+            .Where(t => t.UserId == user.Id && !t.IsUsed && t.ExpiresAt > DateTime.UtcNow)
+            .ToListAsync();
+
+        foreach (var old in previousTokens)
+            old.IsUsed = true;
+
+        // Generar token seguro
+        var resetToken = GeneratePasswordResetToken(user.Id);
+        _context.PasswordResetTokens.Add(resetToken);
+        await _context.SaveChangesAsync();
+
+        // Construir enlace de recuperacion
+        var resetLink = $"{frontendBaseUrl.TrimEnd('/')}/restablecer-contrasena?token={Uri.EscapeDataString(resetToken.Token)}";
+
+        // Enviar correo
+        try
+        {
+            await _emailService.SendPasswordResetEmailAsync(user.Email, user.Name, resetLink);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "No se pudo enviar correo de recuperacion a {Email}", email);
+            // No propagar la excepcion — el endpoint siempre responde igual
+        }
+    }
+
+    // ─── Validate Reset Token ────────────────────────────────────────────────
+
+    public async Task<ValidateResetTokenResponse> ValidateResetTokenAsync(string token)
+    {
+        var resetToken = await _context.PasswordResetTokens
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.Token == token);
+
+        if (resetToken is null)
+            return new ValidateResetTokenResponse
+            {
+                IsValid = false,
+                UserName = string.Empty,
+                Message = "El enlace de recuperacion no es valido."
+            };
+
+        if (resetToken.IsUsed)
+            return new ValidateResetTokenResponse
+            {
+                IsValid = false,
+                UserName = resetToken.User.Name,
+                Message = "Este enlace ya fue utilizado. Solicita uno nuevo."
+            };
+
+        if (resetToken.IsExpired)
+            return new ValidateResetTokenResponse
+            {
+                IsValid = false,
+                UserName = resetToken.User.Name,
+                Message = "El enlace ha expirado. Solicita uno nuevo."
+            };
+
+        return new ValidateResetTokenResponse
+        {
+            IsValid = true,
+            UserName = resetToken.User.Name,
+        };
+    }
+
+    // ─── Reset Password ──────────────────────────────────────────────────────
+
+    public async Task ResetPasswordAsync(string token, string newPassword)
+    {
+        var resetToken = await _context.PasswordResetTokens
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.Token == token);
+
+        if (resetToken is null)
+            throw new InvalidOperationException("Token de recuperacion invalido.");
+
+        if (resetToken.IsUsed)
+            throw new InvalidOperationException("Este enlace ya fue utilizado. Solicita uno nuevo.");
+
+        if (resetToken.IsExpired)
+            throw new InvalidOperationException("El enlace ha expirado. Solicita uno nuevo.");
+
+        // Actualizar contrasena
+        resetToken.User.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        resetToken.User.UpdatedAt = DateTime.UtcNow;
+
+        // Marcar token como usado
+        resetToken.IsUsed = true;
+        resetToken.UsedAt = DateTime.UtcNow;
+
+        // Revocar todos los refresh tokens activos del usuario (forzar re-login)
+        var activeRefreshTokens = await _context.RefreshTokens
+            .Where(rt => rt.UserId == resetToken.UserId && !rt.IsRevoked && rt.ExpiresAt > DateTime.UtcNow)
+            .ToListAsync();
+
+        foreach (var rt in activeRefreshTokens)
+        {
+            rt.IsRevoked = true;
+            rt.RevokedAt = DateTime.UtcNow;
+            rt.RevokedByIp = "password-reset";
+        }
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Contrasena actualizada exitosamente para usuario {UserId}", resetToken.UserId);
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────────
@@ -214,6 +419,26 @@ public class AuthLogic : IAuthLogic
             ExpiresAt = DateTime.UtcNow.AddDays(expiryDays),
             CreatedByIp = ipAddress,
             UserId = userId,
+        };
+    }
+
+    private PasswordResetToken GeneratePasswordResetToken(int userId)
+    {
+        var randomBytes = new byte[64];
+        RandomNumberGenerator.Fill(randomBytes);
+        // URL-safe Base64 (reemplazar +/ por -_ y quitar =)
+        var tokenString = Convert.ToBase64String(randomBytes)
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
+
+        var expiryMinutes = _config.GetValue("Email:ResetTokenExpirationMinutes", 60);
+
+        return new PasswordResetToken
+        {
+            Token     = tokenString,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes),
+            UserId    = userId,
         };
     }
 

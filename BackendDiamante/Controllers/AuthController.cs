@@ -95,15 +95,75 @@ public class AuthController : ControllerBase
         }
     }
 
+    // POST api/auth/social/microsoft
+    [HttpPost("social/microsoft")]
+    [EnableRateLimiting("login")]
+    public async Task<ActionResult<LoginResponse>> MicrosoftLogin([FromBody] MicrosoftLoginRequest request)
+    {
+        try
+        {
+            var ip = GetIpAddress();
+            var result = await _authLogic.MicrosoftLoginAsync(request.AccessToken, ip);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+    }
+
     // POST api/auth/social/{provider}  — stub para proveedores no configurados
-    // La constraint regex excluye "google" para que nunca capture esa ruta específica
-    [HttpPost("social/{provider:regex(^(?!google$)[[a-z]]+$)}")]
+    [HttpPost("social/{provider:regex(^(?!google$|microsoft$)[[a-z]]+$)}")]
     public IActionResult SocialLogin(string provider)
     {
         return StatusCode(StatusCodes.Status501NotImplemented, new
         {
-            message = $"Login con {provider} no está disponible aún. Próximamente."
+            message = $"Login con {provider} no esta disponible aun. Proximamente."
         });
+    }
+
+    // POST api/auth/forgot-password
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting("login")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        // Obtener base URL del frontend desde el header Origin o fallback local
+        var frontendUrl = Request.Headers.Origin.FirstOrDefault() ?? "http://localhost:5173";
+
+        await _authLogic.ForgotPasswordAsync(request.Email, frontendUrl);
+
+        // Siempre responder igual — anti-enumeracion de usuarios
+        return Ok(new
+        {
+            message = "Si el correo existe en nuestro sistema, recibiras un enlace de recuperacion."
+        });
+    }
+
+    // GET api/auth/validate-reset-token?token=xxx
+    [HttpGet("validate-reset-token")]
+    public async Task<ActionResult<ValidateResetTokenResponse>> ValidateResetToken([FromQuery] string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return BadRequest(new { message = "Token requerido" });
+
+        var result = await _authLogic.ValidateResetTokenAsync(token);
+        return Ok(result);
+    }
+
+    // POST api/auth/reset-password
+    [HttpPost("reset-password")]
+    [EnableRateLimiting("login")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        try
+        {
+            await _authLogic.ResetPasswordAsync(request.Token, request.NewPassword);
+            return Ok(new { message = "Contrasena actualizada exitosamente." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     // ─── Helper ───────────────────────────────────────────────────────────────
