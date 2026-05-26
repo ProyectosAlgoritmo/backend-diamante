@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using BackendDiamante.Models.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -12,15 +12,16 @@ public partial class ApplicationDbContext : DbContext
     {
     }
 
-    public virtual DbSet<Module> Modules { get; set; }
-
-    public virtual DbSet<Permission> Permissions { get; set; }
-
-    public virtual DbSet<Role> Roles { get; set; }
-
+    // ─── Roles & Permissions (scaffolded) ─────────────────────────────────────
+    public virtual DbSet<Module>         Modules         { get; set; }
+    public virtual DbSet<Permission>     Permissions     { get; set; }
+    public virtual DbSet<Role>           Roles           { get; set; }
     public virtual DbSet<RolePermission> RolePermissions { get; set; }
+    public virtual DbSet<Submodule>      Submodules      { get; set; }
 
-    public virtual DbSet<Submodule> Submodules { get; set; }
+    // ─── Auth (new dev) ───────────────────────────────────────────────────────
+    public DbSet<User>         Users         { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,6 +49,7 @@ public partial class ApplicationDbContext : DbContext
                 .HasConstraintName("FK_Permissions_Submodules");
         });
 
+        // ─── Roles ────────────────────────────────────────────────────────────
         modelBuilder.Entity<Role>(entity =>
         {
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
@@ -87,6 +89,34 @@ public partial class ApplicationDbContext : DbContext
                 .HasForeignKey(d => d.ModuleId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Submodules_Modules");
+        });
+
+        // ─── Users ────────────────────────────────────────────────────────────
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("Users");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Email).IsRequired().HasMaxLength(200);
+            entity.HasIndex(e => e.Email).IsUnique();
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(150);
+            entity.Property(e => e.PasswordHash).IsRequired();
+            entity.Property(e => e.Role).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        // ─── RefreshTokens ────────────────────────────────────────────────────
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("RefreshTokens");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Token).IsRequired().HasMaxLength(200);
+            entity.HasIndex(e => e.Token).IsUnique();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(e => e.User)
+                  .WithMany(u => u.RefreshTokens)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         OnModelCreatingPartial(modelBuilder);
