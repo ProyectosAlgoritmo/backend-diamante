@@ -23,6 +23,13 @@ public partial class ApplicationDbContext : DbContext
     public DbSet<User>         Users         { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
 
+    // ─── Business (Centros de Costo) ──────────────────────────────────────────
+    public virtual DbSet<Company>             Companies             { get; set; }
+    public virtual DbSet<Sector>              Sectors               { get; set; }
+    public virtual DbSet<Operator>            Operators             { get; set; }
+    public virtual DbSet<CostCenter>          CostCenters           { get; set; }
+    public virtual DbSet<CostCenterOperator>  CostCenterOperators   { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Module>(entity =>
@@ -117,6 +124,80 @@ public partial class ApplicationDbContext : DbContext
                   .WithMany(u => u.RefreshTokens)
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ─── Business: Companies ──────────────────────────────────────────────
+        modelBuilder.Entity<Company>(entity =>
+        {
+            entity.ToTable("Companies", "business");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.Name).HasMaxLength(200);
+        });
+
+        // ─── Business: Sectors ────────────────────────────────────────────────
+        modelBuilder.Entity<Sector>(entity =>
+        {
+            entity.ToTable("Sectors", "business");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.Name).HasMaxLength(100);
+        });
+
+        // ─── Business: Operators ──────────────────────────────────────────────
+        modelBuilder.Entity<Operator>(entity =>
+        {
+            entity.ToTable("Operators", "business");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.Role).HasMaxLength(100);
+            entity.Property(e => e.Shift).HasMaxLength(50);
+
+            entity.HasOne(d => d.Sector).WithMany(p => p.Operators)
+                .HasForeignKey(d => d.SectorId)
+                .HasConstraintName("FK_Operators_Sectors");
+        });
+
+        // ─── Business: CostCenters ────────────────────────────────────────────
+        modelBuilder.Entity<CostCenter>(entity =>
+        {
+            entity.ToTable("CostCenters", "business");
+
+            entity.HasIndex(e => e.Code, "UQ_CostCenters_Code").IsUnique();
+
+            entity.Property(e => e.Address).HasMaxLength(500);
+            entity.Property(e => e.Code).HasMaxLength(50);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.Name).HasMaxLength(200);
+
+            entity.HasOne(d => d.Company).WithMany(p => p.CostCenters)
+                .HasForeignKey(d => d.CompanyId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_CostCenters_Companies");
+        });
+
+        // ─── Business: CostCenterOperators ────────────────────────────────────
+        modelBuilder.Entity<CostCenterOperator>(entity =>
+        {
+            entity.ToTable("CostCenterOperators", "business");
+
+            entity.HasIndex(e => new { e.CostCenterId, e.OperatorId }, "UQ_CostCenterOperators").IsUnique();
+
+            entity.Property(e => e.AssignedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.CostCenter).WithMany(p => p.CostCenterOperators)
+                .HasForeignKey(d => d.CostCenterId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_CostCenterOperators_CostCenters");
+
+            entity.HasOne(d => d.Operator).WithMany(p => p.CostCenterOperators)
+                .HasForeignKey(d => d.OperatorId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_CostCenterOperators_Operators");
         });
 
         OnModelCreatingPartial(modelBuilder);

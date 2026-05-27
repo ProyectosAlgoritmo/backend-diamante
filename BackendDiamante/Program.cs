@@ -93,9 +93,10 @@ builder.Services.AddCors(options =>
 builder.Services.AddHttpClient();
 
 // ─── Servicios de negocio ─────────────────────────────────────────────────────
-builder.Services.AddScoped<IRolesLogic,   RolesLogic>();
-builder.Services.AddScoped<IModulesLogic, ModulesLogic>();
-builder.Services.AddScoped<IAuthLogic,    AuthLogic>();
+builder.Services.AddScoped<IRolesLogic,       RolesLogic>();
+builder.Services.AddScoped<IModulesLogic,     ModulesLogic>();
+builder.Services.AddScoped<IAuthLogic,        AuthLogic>();
+builder.Services.AddScoped<ICostCentersLogic, CostCentersLogic>();
 
 // ─────────────────────────────────────────────────────────────────────────────
 
