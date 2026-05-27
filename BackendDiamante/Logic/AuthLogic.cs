@@ -35,6 +35,17 @@ public class AuthLogic : IAuthLogic
         _logger = logger;
     }
 
+    // ─── Validacion de dominio empresarial ──────────────────────────────────
+    private void ValidateDomain(string email)
+    {
+        var allowedDomain = _config["Auth:AllowedDomain"];
+        if (string.IsNullOrEmpty(allowedDomain)) return; // Si no esta configurado, no restringir
+
+        var domain = email.Trim().ToLower().Split('@').LastOrDefault();
+        if (!string.Equals(domain, allowedDomain.Trim().ToLower(), StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Acceso restringido a cuentas empresariales @" + allowedDomain);
+    }
+
     // ─── Modelo interno para deserializar respuesta de Google userinfo ────────
     private sealed record GoogleUserInfo(
         string Sub,
@@ -48,11 +59,14 @@ public class AuthLogic : IAuthLogic
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request, string ipAddress)
     {
+        var email = request.Email.Trim().ToLower();
+        ValidateDomain(email);
+
         var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower().Trim());
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == email);
 
         if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            throw new UnauthorizedAccessException("Credenciales incorrectas");
+            throw new UnauthorizedAccessException("Usuario no autorizado");
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
@@ -142,25 +156,14 @@ public class AuthLogic : IAuthLogic
         if (userInfo is null || string.IsNullOrEmpty(userInfo.Email))
             throw new UnauthorizedAccessException("Token de Google no contiene información de usuario");
 
-        // Buscar usuario existente por email
+        ValidateDomain(userInfo.Email);
+
+        // Buscar usuario existente — NO crear automaticamente
         var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Email.ToLower() == userInfo.Email.ToLower());
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == userInfo.Email.Trim().ToLower());
 
         if (user is null)
-        {
-            // Crear usuario nuevo con rol 'cliente' por defecto
-            user = new User
-            {
-                Email = userInfo.Email,
-                Name = userInfo.Name ?? userInfo.Email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()),
-                Role = "cliente",
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-            };
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync(); // Necesitamos el Id antes de crear el token
-        }
+            throw new UnauthorizedAccessException("Usuario no autorizado");
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
@@ -218,23 +221,14 @@ public class AuthLogic : IAuthLogic
         if (userInfo is null || string.IsNullOrEmpty(email))
             throw new UnauthorizedAccessException("Token de Microsoft no contiene informacion de usuario");
 
+        ValidateDomain(email);
+
+        // Buscar usuario existente — NO crear automaticamente
         var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.Trim().ToLower());
 
         if (user is null)
-        {
-            user = new User
-            {
-                Email = email,
-                Name = userInfo.DisplayName ?? email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()),
-                Role = "cliente",
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-            };
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-        }
+            throw new UnauthorizedAccessException("Usuario no autorizado");
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta esta desactivada. Contacta al administrador.");

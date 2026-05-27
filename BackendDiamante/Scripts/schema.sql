@@ -1,7 +1,7 @@
 -- ============================================================
 --  Limpieza Inteligente / Diamante
 --  Schema completo de base de datos
---  Motor: SQL Server (SQLEXPRESS local / SQL Server en producción)
+--  Motor: SQL Server (SQLEXPRESS local / SQL Server en produccion)
 --  Ejecutar una sola vez en la instancia destino.
 -- ============================================================
 
@@ -24,10 +24,10 @@ BEGIN
         CONSTRAINT PK_Roles PRIMARY KEY (Id)
     );
 
-    PRINT '✅ Tabla Roles creada.';
+    PRINT 'Tabla Roles creada.';
 END
 ELSE
-    PRINT '⚠️  Tabla Roles ya existe, se omite.';
+    PRINT 'Tabla Roles ya existe, se omite.';
 GO
 
 -- ──────────────────────────────────────────────────────────────
@@ -49,13 +49,13 @@ BEGIN
         CONSTRAINT PK_Users PRIMARY KEY (Id)
     );
 
-    -- Email único
+    -- Email unico
     CREATE UNIQUE INDEX IX_Users_Email ON dbo.Users (Email);
 
-    PRINT '✅ Tabla Users creada.';
+    PRINT 'Tabla Users creada.';
 END
 ELSE
-    PRINT '⚠️  Tabla Users ya existe, se omite.';
+    PRINT 'Tabla Users ya existe, se omite.';
 GO
 
 -- ──────────────────────────────────────────────────────────────
@@ -81,14 +81,14 @@ BEGIN
             ON DELETE CASCADE
     );
 
-    -- Token único
+    -- Token unico
     CREATE UNIQUE INDEX IX_RefreshTokens_Token  ON dbo.RefreshTokens (Token);
     CREATE        INDEX IX_RefreshTokens_UserId ON dbo.RefreshTokens (UserId);
 
-    PRINT '✅ Tabla RefreshTokens creada.';
+    PRINT 'Tabla RefreshTokens creada.';
 END
 ELSE
-    PRINT '⚠️  Tabla RefreshTokens ya existe, se omite.';
+    PRINT 'Tabla RefreshTokens ya existe, se omite.';
 GO
 
 -- ──────────────────────────────────────────────────────────────
@@ -122,36 +122,52 @@ ELSE
 GO
 
 -- ──────────────────────────────────────────────────────────────
---  5. SEED — usuarios de prueba
---     Los hashes son BCrypt work factor 12.
---     admin@diamante.co      → Admin123!
---     supervisor@diamante.co → Super123!
---     cliente@diamante.co    → Cliente123!
+--  5. SEED — usuarios de prueba @diamante.net.co
+--     Hash BCrypt work factor 12.
+--     Contrasena para los 3: X@132204513375aj
 -- ──────────────────────────────────────────────────────────────
-IF NOT EXISTS (SELECT 1 FROM dbo.Users)
+
+-- Administrador
+IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Email = 'limpieza.inteligente@diamante.net.co')
 BEGIN
     INSERT INTO dbo.Users (Email, Name, PasswordHash, Role, IsActive, CreatedAt)
-    VALUES
-        ('admin@diamante.co',
-         'Administrador Diamante',
-         '$2a$12$GkMFMFAMJRZEb.4wlPNpouSHa5VGlFCNoI7fT.ZFLjr2qMFO2Udma',
-         'admin', 1, GETUTCDATE()),
-
-        ('supervisor@diamante.co',
-         'Supervisor Diamante',
-         '$2a$12$JGj1y8VG7fANVMkjZB1Hn.WzTBlz1blQVgOkrNfKM8uqFNq.lpbGy',
-         'supervisor', 1, GETUTCDATE()),
-
-        ('cliente@diamante.co',
-         'Cliente Diamante',
-         '$2a$12$y56rT/F3EV2eYmrVVDqvhuEIWJZz.0WC0VZ/Yv6OGmXVXVpT9Xn8S',
-         'cliente', 1, GETUTCDATE());
-
-    PRINT '✅ Usuarios de prueba insertados.';
+    VALUES (
+        'limpieza.inteligente@diamante.net.co',
+        'Administrador Diamante',
+        '$2b$12$YwAmJZBze3x2gmktdAfozeeBlBqOaRXXDQGIjNKMSLwrLyCIP/n/q',
+        'admin', 1, GETUTCDATE()
+    );
+    PRINT 'Usuario administrador insertado.';
 END
-ELSE
-    PRINT '⚠️  Ya existen usuarios, seed omitido.';
 GO
 
-PRINT '🏁 Schema aplicado correctamente.';
+-- Supervisor
+IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Email = 'supervisor.prueba@diamante.net.co')
+BEGIN
+    INSERT INTO dbo.Users (Email, Name, PasswordHash, Role, IsActive, CreatedAt)
+    VALUES (
+        'supervisor.prueba@diamante.net.co',
+        'Supervisor Diamante',
+        '$2b$12$YwAmJZBze3x2gmktdAfozeeBlBqOaRXXDQGIjNKMSLwrLyCIP/n/q',
+        'supervisor', 1, GETUTCDATE()
+    );
+    PRINT 'Usuario supervisor insertado.';
+END
+GO
+
+-- Cliente
+IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Email = 'cliente.prueba@diamante.net.co')
+BEGIN
+    INSERT INTO dbo.Users (Email, Name, PasswordHash, Role, IsActive, CreatedAt)
+    VALUES (
+        'cliente.prueba@diamante.net.co',
+        'Cliente Diamante',
+        '$2b$12$YwAmJZBze3x2gmktdAfozeeBlBqOaRXXDQGIjNKMSLwrLyCIP/n/q',
+        'cliente', 1, GETUTCDATE()
+    );
+    PRINT 'Usuario cliente insertado.';
+END
+GO
+
+PRINT 'Schema aplicado correctamente.';
 GO
