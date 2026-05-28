@@ -97,6 +97,7 @@ builder.Services.AddScoped<IRolesLogic,   RolesLogic>();
 builder.Services.AddScoped<IModulesLogic, ModulesLogic>();
 builder.Services.AddScoped<IAuthLogic,    AuthLogic>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ICostCentersLogic, CostCentersLogic>();
 
 // ─────────────────────────────────────────────────────────────────────────────
 

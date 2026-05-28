@@ -169,5 +169,123 @@ BEGIN
 END
 GO
 
-PRINT 'Schema aplicado correctamente.';
+-- ──────────────────────────────────────────────────────────────
+--  5. BUSINESS SCHEMA
+-- ──────────────────────────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'business')
+BEGIN
+    EXEC('CREATE SCHEMA business');
+    PRINT '✅ Schema [business] creado.';
+END
+ELSE
+    PRINT '⚠️  Schema [business] ya existe, se omite.';
+GO
+
+-- ─── 5.1 Companies ───────────────────────────────────────────
+IF OBJECT_ID(N'business.Companies', N'U') IS NULL
+BEGIN
+    CREATE TABLE business.Companies (
+        Id        INT           NOT NULL IDENTITY(1,1),
+        Name      NVARCHAR(200) NOT NULL,
+        IsActive  BIT           NOT NULL CONSTRAINT DF_Companies_IsActive  DEFAULT (1),
+        CreatedAt DATETIME2     NOT NULL CONSTRAINT DF_Companies_CreatedAt DEFAULT (GETUTCDATE()),
+        UpdatedAt DATETIME2         NULL,
+        DeletedAt DATETIME2         NULL,
+
+        CONSTRAINT PK_Companies PRIMARY KEY (Id)
+    );
+    PRINT '✅ Tabla business.Companies creada.';
+END
+ELSE
+    PRINT '⚠️  Tabla business.Companies ya existe, se omite.';
+GO
+
+-- ─── 5.2 Sectors ─────────────────────────────────────────────
+IF OBJECT_ID(N'business.Sectors', N'U') IS NULL
+BEGIN
+    CREATE TABLE business.Sectors (
+        Id        INT           NOT NULL IDENTITY(1,1),
+        Name      NVARCHAR(100) NOT NULL,
+        CreatedAt DATETIME2     NOT NULL CONSTRAINT DF_Sectors_CreatedAt DEFAULT (GETUTCDATE()),
+
+        CONSTRAINT PK_Sectors PRIMARY KEY (Id)
+    );
+    PRINT '✅ Tabla business.Sectors creada.';
+END
+ELSE
+    PRINT '⚠️  Tabla business.Sectors ya existe, se omite.';
+GO
+
+-- ─── 5.3 Operators ───────────────────────────────────────────
+IF OBJECT_ID(N'business.Operators', N'U') IS NULL
+BEGIN
+    CREATE TABLE business.Operators (
+        Id        INT           NOT NULL IDENTITY(1,1),
+        Name      NVARCHAR(200) NOT NULL,
+        Role      NVARCHAR(100) NOT NULL,
+        Shift     NVARCHAR(50)  NOT NULL,
+        SectorId  INT               NULL,
+        IsActive  BIT           NOT NULL CONSTRAINT DF_Operators_IsActive  DEFAULT (1),
+        CreatedAt DATETIME2     NOT NULL CONSTRAINT DF_Operators_CreatedAt DEFAULT (GETUTCDATE()),
+        UpdatedAt DATETIME2         NULL,
+
+        CONSTRAINT PK_Operators   PRIMARY KEY (Id),
+        CONSTRAINT FK_Operators_Sectors
+            FOREIGN KEY (SectorId) REFERENCES business.Sectors (Id)
+    );
+    PRINT '✅ Tabla business.Operators creada.';
+END
+ELSE
+    PRINT '⚠️  Tabla business.Operators ya existe, se omite.';
+GO
+
+-- ─── 5.4 CostCenters ─────────────────────────────────────────
+IF OBJECT_ID(N'business.CostCenters', N'U') IS NULL
+BEGIN
+    CREATE TABLE business.CostCenters (
+        Id        INT           NOT NULL IDENTITY(1,1),
+        Code      NVARCHAR(50)  NOT NULL,
+        Name      NVARCHAR(200) NOT NULL,
+        Address   NVARCHAR(500)     NULL,
+        Areas     INT           NOT NULL CONSTRAINT DF_CostCenters_Areas DEFAULT (0),
+        CompanyId INT           NOT NULL,
+        IsActive  BIT           NOT NULL CONSTRAINT DF_CostCenters_IsActive  DEFAULT (1),
+        CreatedAt DATETIME2     NOT NULL CONSTRAINT DF_CostCenters_CreatedAt DEFAULT (GETUTCDATE()),
+        UpdatedAt DATETIME2         NULL,
+        DeletedAt DATETIME2         NULL,
+
+        CONSTRAINT PK_CostCenters PRIMARY KEY (Id),
+        CONSTRAINT UQ_CostCenters_Code UNIQUE (Code),
+        CONSTRAINT FK_CostCenters_Companies
+            FOREIGN KEY (CompanyId) REFERENCES business.Companies (Id)
+    );
+    PRINT '✅ Tabla business.CostCenters creada.';
+END
+ELSE
+    PRINT '⚠️  Tabla business.CostCenters ya existe, se omite.';
+GO
+
+-- ─── 5.5 CostCenterOperators ─────────────────────────────────
+IF OBJECT_ID(N'business.CostCenterOperators', N'U') IS NULL
+BEGIN
+    CREATE TABLE business.CostCenterOperators (
+        Id           INT       NOT NULL IDENTITY(1,1),
+        CostCenterId INT       NOT NULL,
+        OperatorId   INT       NOT NULL,
+        AssignedAt   DATETIME2 NOT NULL CONSTRAINT DF_CostCenterOperators_AssignedAt DEFAULT (GETUTCDATE()),
+
+        CONSTRAINT PK_CostCenterOperators PRIMARY KEY (Id),
+        CONSTRAINT UQ_CostCenterOperators  UNIQUE (CostCenterId, OperatorId),
+        CONSTRAINT FK_CostCenterOperators_CostCenters
+            FOREIGN KEY (CostCenterId) REFERENCES business.CostCenters (Id),
+        CONSTRAINT FK_CostCenterOperators_Operators
+            FOREIGN KEY (OperatorId)   REFERENCES business.Operators (Id)
+    );
+    PRINT '✅ Tabla business.CostCenterOperators creada.';
+END
+ELSE
+    PRINT '⚠️  Tabla business.CostCenterOperators ya existe, se omite.';
+GO
+
+PRINT '🏁 Schema aplicado correctamente.';
 GO
