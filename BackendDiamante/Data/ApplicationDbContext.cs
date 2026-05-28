@@ -97,6 +97,8 @@ public partial class ApplicationDbContext : DbContext
         {
             entity.ToTable("Users");
             entity.HasKey(e => e.Id);
+
+            // Campos originales (auth)
             entity.Property(e => e.Email).IsRequired().HasMaxLength(200);
             entity.HasIndex(e => e.Email).IsUnique();
             entity.Property(e => e.Name).IsRequired().HasMaxLength(150);
@@ -104,6 +106,17 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.Role).IsRequired().HasMaxLength(50);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            // Campos extendidos (modulo Usuarios)
+            entity.Property(e => e.FirstName).HasMaxLength(100);
+            entity.Property(e => e.LastName).HasMaxLength(100);
+            entity.Property(e => e.Username).HasMaxLength(50);
+            entity.HasIndex(e => e.Username).IsUnique().HasFilter("[Username] IS NOT NULL");
+            entity.Property(e => e.Phone).HasMaxLength(30);
+            entity.Property(e => e.DocumentId).HasMaxLength(30);
+            entity.HasIndex(e => e.DocumentId).IsUnique().HasFilter("[DocumentId] IS NOT NULL");
+            entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("Activo");
+            entity.Property(e => e.Certificates).HasColumnType("NVARCHAR(MAX)");
         });
 
         // ─── RefreshTokens ────────────────────────────────────────────────────
