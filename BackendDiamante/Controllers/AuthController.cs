@@ -20,35 +20,23 @@ public class AuthController : ControllerBase
 
     // POST api/auth/login
     [HttpPost("login")]
+    [AllowAnonymous]
     [EnableRateLimiting("login")]
     public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request)
     {
-        try
-        {
-            var ip = GetIpAddress();
-            var result = await _authLogic.LoginAsync(request, ip);
-            return Ok(result);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { message = ex.Message });
-        }
+        var ip = GetIpAddress();
+        var result = await _authLogic.LoginAsync(request, ip);
+        return Ok(result);
     }
 
     // POST api/auth/refresh
     [HttpPost("refresh")]
+    [AllowAnonymous]
     public async Task<ActionResult<LoginResponse>> Refresh([FromBody] RefreshTokenRequest request)
     {
-        try
-        {
-            var ip = GetIpAddress();
-            var result = await _authLogic.RefreshTokenAsync(request.RefreshToken, ip);
-            return Ok(result);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { message = ex.Message });
-        }
+        var ip = GetIpAddress();
+        var result = await _authLogic.RefreshTokenAsync(request.RefreshToken, ip);
+        return Ok(result);
     }
 
     // POST api/auth/logout  (requiere JWT válido)
@@ -80,40 +68,29 @@ public class AuthController : ControllerBase
 
     // POST api/auth/social/google
     [HttpPost("social/google")]
+    [AllowAnonymous]
     [EnableRateLimiting("login")]
     public async Task<ActionResult<LoginResponse>> GoogleLogin([FromBody] GoogleLoginRequest request)
     {
-        try
-        {
-            var ip = GetIpAddress();
-            var result = await _authLogic.GoogleLoginAsync(request.AccessToken, ip);
-            return Ok(result);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { message = ex.Message });
-        }
+        var ip = GetIpAddress();
+        var result = await _authLogic.GoogleLoginAsync(request.AccessToken, ip);
+        return Ok(result);
     }
 
     // POST api/auth/social/microsoft
     [HttpPost("social/microsoft")]
+    [AllowAnonymous]
     [EnableRateLimiting("login")]
     public async Task<ActionResult<LoginResponse>> MicrosoftLogin([FromBody] MicrosoftLoginRequest request)
     {
-        try
-        {
-            var ip = GetIpAddress();
-            var result = await _authLogic.MicrosoftLoginAsync(request.AccessToken, ip);
-            return Ok(result);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { message = ex.Message });
-        }
+        var ip = GetIpAddress();
+        var result = await _authLogic.MicrosoftLoginAsync(request.AccessToken, ip);
+        return Ok(result);
     }
 
     // POST api/auth/social/{provider}  — stub para proveedores no configurados
     [HttpPost("social/{provider:regex(^(?!google$|microsoft$)[[a-z]]+$)}")]
+    [AllowAnonymous]
     public IActionResult SocialLogin(string provider)
     {
         return StatusCode(StatusCodes.Status501NotImplemented, new
@@ -124,6 +101,7 @@ public class AuthController : ControllerBase
 
     // POST api/auth/forgot-password
     [HttpPost("forgot-password")]
+    [AllowAnonymous]
     [EnableRateLimiting("login")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
@@ -141,6 +119,7 @@ public class AuthController : ControllerBase
 
     // GET api/auth/validate-reset-token?token=xxx
     [HttpGet("validate-reset-token")]
+    [AllowAnonymous]
     public async Task<ActionResult<ValidateResetTokenResponse>> ValidateResetToken([FromQuery] string token)
     {
         if (string.IsNullOrWhiteSpace(token))
@@ -152,18 +131,12 @@ public class AuthController : ControllerBase
 
     // POST api/auth/reset-password
     [HttpPost("reset-password")]
+    [AllowAnonymous]
     [EnableRateLimiting("login")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
-        try
-        {
-            await _authLogic.ResetPasswordAsync(request.Token, request.NewPassword);
-            return Ok(new { message = "Contrasena actualizada exitosamente." });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        await _authLogic.ResetPasswordAsync(request.Token, request.NewPassword);
+        return Ok(new { message = "Contrasena actualizada exitosamente." });
     }
 
     // ─── Helper ───────────────────────────────────────────────────────────────

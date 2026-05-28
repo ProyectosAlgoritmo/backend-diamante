@@ -8,6 +8,7 @@ using BackendDiamante.Data;
 using BackendDiamante.Logic.Interfaces;
 using BackendDiamante.Models.DTOs.Auth;
 using BackendDiamante.Models.Entities;
+using BackendDiamante.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -79,7 +80,7 @@ public class AuthLogic : IAuthLogic
         _context.RefreshTokens.Add(refreshToken);
         await _context.SaveChangesAsync();
 
-        return BuildLoginResponse(accessToken, refreshToken, user);
+        return await BuildLoginResponseAsync(accessToken, refreshToken, user);
     }
 
     // ─── Refresh Token ────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ public class AuthLogic : IAuthLogic
         var accessToken = GenerateAccessToken(refreshToken.User);
         await _context.SaveChangesAsync();
 
-        return BuildLoginResponse(accessToken, newRefreshToken, refreshToken.User);
+        return await BuildLoginResponseAsync(accessToken, newRefreshToken, refreshToken.User);
     }
 
     // ─── Logout ───────────────────────────────────────────────────────────────
@@ -175,7 +176,7 @@ public class AuthLogic : IAuthLogic
         _context.RefreshTokens.Add(refreshToken);
         await _context.SaveChangesAsync();
 
-        return BuildLoginResponse(accessToken, refreshToken, user);
+        return await BuildLoginResponseAsync(accessToken, refreshToken, user);
     }
 
     // ─── Microsoft Login ───────────────────────────────────────────────────────
@@ -240,7 +241,7 @@ public class AuthLogic : IAuthLogic
         _context.RefreshTokens.Add(refreshToken);
         await _context.SaveChangesAsync();
 
-        return BuildLoginResponse(accessToken, refreshToken, user);
+        return await BuildLoginResponseAsync(accessToken, refreshToken, user);
     }
 
     // ─── Get Current User ─────────────────────────────────────────────────────
@@ -248,7 +249,7 @@ public class AuthLogic : IAuthLogic
     public async Task<UserInfoResponse?> GetCurrentUserAsync(int userId)
     {
         var user = await _context.Users.FindAsync(userId);
-        return user is null ? null : MapToUserInfo(user);
+        return user is null ? null : await MapToUserInfoAsync(user);
     }
 
     // ─── Forgot Password ──────────────────────────────────────────────────────
@@ -436,19 +437,32 @@ public class AuthLogic : IAuthLogic
         };
     }
 
-    private static LoginResponse BuildLoginResponse(string accessToken, RefreshToken refreshToken, User user) => new()
+    private async Task<LoginResponse> BuildLoginResponseAsync(string accessToken, RefreshToken refreshToken, User user) => new()
     {
         AccessToken = accessToken,
         RefreshToken = refreshToken.Token,
         ExpiresAt = refreshToken.ExpiresAt,
-        User = MapToUserInfo(user),
+        User = await MapToUserInfoAsync(user),
     };
 
-    private static UserInfoResponse MapToUserInfo(User user) => new()
+    private async Task<UserInfoResponse> MapToUserInfoAsync(User user) => new()
     {
         Id = user.Id,
         Email = user.Email,
         Name = user.Name,
         Role = user.Role,
+        Permissions = await GetPermissionsByRoleAsync(user.Role),
     };
+
+    private Task<List<string>> GetPermissionsByRoleAsync(string roleName) =>
+        RoleNameResolver.IsAdministrator(roleName)
+            ? _context.Permissions
+                .Select(p => p.Code)
+                .Distinct()
+                .ToListAsync()
+            : _context.Roles
+                .Where(r => r.Name == RoleNameResolver.Resolve(roleName) && r.IsActive && r.DeletedAt == null)
+                .SelectMany(r => r.RolePermissions.Select(rp => rp.Permission.Code))
+                .Distinct()
+                .ToListAsync();
 }

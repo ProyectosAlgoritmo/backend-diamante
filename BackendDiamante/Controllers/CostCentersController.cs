@@ -1,9 +1,12 @@
 using BackendDiamante.Logic.Interfaces;
 using BackendDiamante.Models.DTOs.CostCenters;
+using BackendDiamante.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BackendDiamante.Controllers;
 
+[Authorize]
 public class CostCentersController : BaseController
 {
     private readonly ICostCentersLogic _logic;
@@ -16,6 +19,7 @@ public class CostCentersController : BaseController
     // ─── Cost Centers ─────────────────────────────────────────────────────────
 
     [HttpGet]
+    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.VIEW")]
     public async Task<IActionResult> GetAll()
     {
         var list = await _logic.GetAllAsync();
@@ -23,6 +27,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpGet("stats")]
+    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.VIEW")]
     public async Task<IActionResult> GetStats()
     {
         var stats = await _logic.GetStatsAsync();
@@ -30,6 +35,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpGet("{id:int}")]
+    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.VIEW")]
     public async Task<IActionResult> GetById(int id)
     {
         var cc = await _logic.GetByIdAsync(id);
@@ -38,35 +44,24 @@ public class CostCentersController : BaseController
     }
 
     [HttpPost]
+    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.CREATE")]
     public async Task<IActionResult> Create([FromBody] CreateCostCenterRequest request)
     {
-        try
-        {
-            var cc = await _logic.CreateAsync(request);
-            return Success(cc, "Centro de costo creado correctamente");
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Error(ex.Message);
-        }
+        var cc = await _logic.CreateAsync(request);
+        return Success(cc, "Centro de costo creado correctamente");
     }
 
     [HttpPut("{id:int}")]
+    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.EDIT")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCostCenterRequest request)
     {
-        try
-        {
-            var cc = await _logic.UpdateAsync(id, request);
-            if (cc is null) return Error("Centro de costo no encontrado", 404);
-            return Success(cc, "Centro de costo actualizado correctamente");
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Error(ex.Message);
-        }
+        var cc = await _logic.UpdateAsync(id, request);
+        if (cc is null) return Error("Centro de costo no encontrado", 404);
+        return Success(cc, "Centro de costo actualizado correctamente");
     }
 
     [HttpDelete("{id:int}")]
+    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.DELETE")]
     public async Task<IActionResult> Delete(int id)
     {
         var deleted = await _logic.DeleteAsync(id);
@@ -75,6 +70,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpPatch("{id:int}/toggle-status")]
+    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.EDIT")]
     public async Task<IActionResult> ToggleStatus(int id)
     {
         var toggled = await _logic.ToggleStatusAsync(id);
@@ -85,6 +81,7 @@ public class CostCentersController : BaseController
     // ─── Operators ────────────────────────────────────────────────────────────
 
     [HttpGet("operators")]
+    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.VIEW")]
     public async Task<IActionResult> GetAllOperators()
     {
         var operators = await _logic.GetAllOperatorsAsync();
@@ -92,6 +89,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpGet("operators/{id:int}")]
+    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.VIEW")]
     public async Task<IActionResult> GetOperatorById(int id)
     {
         var op = await _logic.GetOperatorByIdAsync(id);
@@ -100,35 +98,24 @@ public class CostCentersController : BaseController
     }
 
     [HttpPost("operators")]
+    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.CREATE")]
     public async Task<IActionResult> CreateOperator([FromBody] CreateOperatorRequest request)
     {
-        try
-        {
-            var op = await _logic.CreateOperatorAsync(request);
-            return Success(op, "Operario creado correctamente");
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Error(ex.Message);
-        }
+        var op = await _logic.CreateOperatorAsync(request);
+        return Success(op, "Operario creado correctamente");
     }
 
     [HttpPut("operators/{id:int}")]
+    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.EDIT")]
     public async Task<IActionResult> UpdateOperator(int id, [FromBody] UpdateOperatorRequest request)
     {
-        try
-        {
-            var op = await _logic.UpdateOperatorAsync(id, request);
-            if (op is null) return Error("Operario no encontrado", 404);
-            return Success(op, "Operario actualizado correctamente");
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Error(ex.Message);
-        }
+        var op = await _logic.UpdateOperatorAsync(id, request);
+        if (op is null) return Error("Operario no encontrado", 404);
+        return Success(op, "Operario actualizado correctamente");
     }
 
     [HttpDelete("operators/{id:int}")]
+    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.DELETE")]
     public async Task<IActionResult> DeleteOperator(int id)
     {
         var deleted = await _logic.DeleteOperatorAsync(id);
@@ -139,20 +126,15 @@ public class CostCentersController : BaseController
     // ─── Assignments ──────────────────────────────────────────────────────────
 
     [HttpPost("{id:int}/operators")]
+    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.CREATE")]
     public async Task<IActionResult> AssignOperator(int id, [FromBody] AssignOperatorRequest request)
     {
-        try
-        {
-            await _logic.AssignOperatorAsync(id, request.OperatorId);
-            return Success(new { }, "Operario asignado correctamente");
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Error(ex.Message);
-        }
+        await _logic.AssignOperatorAsync(id, request.OperatorId);
+        return Success(new { }, "Operario asignado correctamente");
     }
 
     [HttpDelete("{id:int}/operators/{operatorId:int}")]
+    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.DELETE")]
     public async Task<IActionResult> UnassignOperator(int id, int operatorId)
     {
         var removed = await _logic.UnassignOperatorAsync(id, operatorId);
@@ -163,6 +145,7 @@ public class CostCentersController : BaseController
     // ─── Support data ─────────────────────────────────────────────────────────
 
     [HttpGet("companies")]
+    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.VIEW")]
     public async Task<IActionResult> GetCompanies()
     {
         var companies = await _logic.GetAllCompaniesAsync();
@@ -170,6 +153,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpGet("sectors")]
+    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.VIEW")]
     public async Task<IActionResult> GetSectors()
     {
         var sectors = await _logic.GetAllSectorsAsync();

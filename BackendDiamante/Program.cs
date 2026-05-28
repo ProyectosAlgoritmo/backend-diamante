@@ -1,8 +1,10 @@
 using System.Text;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 using BackendDiamante.Data;
 using BackendDiamante.Logic;
 using BackendDiamante.Logic.Interfaces;
+using BackendDiamante.Middleware;
 using BackendDiamante.Models.Entities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -54,6 +56,36 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience            = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
             ClockSkew                = TimeSpan.Zero,
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
+
+                var body = JsonSerializer.Serialize(new
+                {
+                    success = false,
+                    message = "Tu sesion no es valida o expiro."
+                });
+
+                await context.Response.WriteAsync(body);
+            },
+            OnForbidden = async context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.ContentType = "application/json";
+
+                var body = JsonSerializer.Serialize(new
+                {
+                    success = false,
+                    message = "No tienes permisos para realizar esta accion."
+                });
+
+                await context.Response.WriteAsync(body);
+            }
         };
     });
 
@@ -107,6 +139,10 @@ var app = builder.Build();
 await SeedDefaultUsersAsync(app);
 
 // ─── Middleware Pipeline ──────────────────────────────────────────────────────
+
+// Manejo global de excepciones — debe ser el primero
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -121,6 +157,7 @@ app.UseRateLimiter();
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<PermissionAuthorizationMiddleware>();
 app.MapControllers();
 
 app.Run();
