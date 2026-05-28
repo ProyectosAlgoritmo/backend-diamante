@@ -6,7 +6,7 @@ using BackendDiamante.Security;
 
 namespace BackendDiamante.Controllers;
 
-[Authorize(Roles = "admin")]
+[Authorize]
 public class RolesController : BaseController
 {
     private readonly IRolesLogic _rolesLogic;
