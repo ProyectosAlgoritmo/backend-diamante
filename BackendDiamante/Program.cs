@@ -1,8 +1,10 @@
 using System.Text;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 using BackendDiamante.Data;
 using BackendDiamante.Logic;
 using BackendDiamante.Logic.Interfaces;
+using BackendDiamante.Middleware;
 using BackendDiamante.Models.Entities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -55,6 +57,36 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
             ClockSkew                = TimeSpan.Zero,
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
+
+                var body = JsonSerializer.Serialize(new
+                {
+                    success = false,
+                    message = "Tu sesion no es valida o expiro."
+                });
+
+                await context.Response.WriteAsync(body);
+            },
+            OnForbidden = async context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.ContentType = "application/json";
+
+                var body = JsonSerializer.Serialize(new
+                {
+                    success = false,
+                    message = "No tienes permisos para realizar esta accion."
+                });
+
+                await context.Response.WriteAsync(body);
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -96,8 +128,9 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<IRolesLogic,   RolesLogic>();
 builder.Services.AddScoped<IModulesLogic, ModulesLogic>();
 builder.Services.AddScoped<IAuthLogic,    AuthLogic>();
-builder.Services.AddScoped<IUsersLogic,   UsersLogic>();
-builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IUsersLogic,       UsersLogic>();
+builder.Services.AddScoped<IEmailService,     EmailService>();
+builder.Services.AddScoped<ICostCentersLogic, CostCentersLogic>();
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -107,6 +140,7 @@ var app = builder.Build();
 await SeedDefaultUsersAsync(app);
 
 // ─── Middleware Pipeline ──────────────────────────────────────────────────────
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -117,10 +151,16 @@ if (app.Environment.IsDevelopment())
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
-app.UseRateLimiter();
+// CORS antes de todo — garantiza headers en TODAS las respuestas (incluidos errores)
 app.UseCors("AllowAll");
+
+// Manejo global de excepciones — después de CORS para que los errores incluyan los headers
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<PermissionAuthorizationMiddleware>();
 app.MapControllers();
 
 app.Run();
