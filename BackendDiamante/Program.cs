@@ -128,7 +128,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<IRolesLogic,   RolesLogic>();
 builder.Services.AddScoped<IModulesLogic, ModulesLogic>();
 builder.Services.AddScoped<IAuthLogic,    AuthLogic>();
-builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IUsersLogic,       UsersLogic>();
+builder.Services.AddScoped<IEmailService,     EmailService>();
 builder.Services.AddScoped<ICostCentersLogic, CostCentersLogic>();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,6 +144,7 @@ await SeedDefaultUsersAsync(app);
 // Manejo global de excepciones — debe ser el primero
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -153,8 +155,13 @@ if (app.Environment.IsDevelopment())
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
-app.UseRateLimiter();
+// CORS antes de todo — garantiza headers en TODAS las respuestas (incluidos errores)
 app.UseCors("AllowAll");
+
+// Manejo global de excepciones — después de CORS para que los errores incluyan los headers
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<PermissionAuthorizationMiddleware>();

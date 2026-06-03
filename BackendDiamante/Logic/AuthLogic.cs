@@ -60,14 +60,29 @@ public class AuthLogic : IAuthLogic
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request, string ipAddress)
     {
-        var email = request.Email.Trim().ToLower();
-        ValidateDomain(email);
+        var identifier = request.Email.Trim();
+        var isEmail = identifier.Contains('@');
 
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Email.ToLower() == email);
+        // Solo validar dominio si es un correo electronico
+        if (isEmail)
+            ValidateDomain(identifier.ToLower());
+
+        // Buscar por email o por username
+        User? user;
+        if (isEmail)
+        {
+            var emailLower = identifier.ToLower();
+            user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == emailLower);
+        }
+        else
+        {
+            user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Username != null && u.Username.ToLower() == identifier.ToLower());
+        }
 
         if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            throw new UnauthorizedAccessException("Usuario no autorizado");
+            throw new UnauthorizedAccessException("Credenciales incorrectas");
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");

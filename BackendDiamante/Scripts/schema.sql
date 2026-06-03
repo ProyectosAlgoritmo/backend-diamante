@@ -289,3 +289,48 @@ GO
 
 PRINT '🏁 Schema aplicado correctamente.';
 GO
+
+-- ──────────────────────────────────────────────────────────────
+--  6. EXTENSION TABLA USERS — campos para modulo Usuarios
+--     (ALTER TABLE seguro — solo agrega si la columna no existe)
+-- ──────────────────────────────────────────────────────────────
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Users') AND name = 'FirstName')
+    ALTER TABLE dbo.Users ADD FirstName NVARCHAR(100) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Users') AND name = 'LastName')
+    ALTER TABLE dbo.Users ADD LastName NVARCHAR(100) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Users') AND name = 'Username')
+    ALTER TABLE dbo.Users ADD Username NVARCHAR(50) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Users') AND name = 'Phone')
+    ALTER TABLE dbo.Users ADD Phone NVARCHAR(30) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Users') AND name = 'DocumentId')
+    ALTER TABLE dbo.Users ADD DocumentId NVARCHAR(30) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Users') AND name = 'Status')
+    ALTER TABLE dbo.Users ADD Status NVARCHAR(20) NOT NULL CONSTRAINT DF_Users_Status DEFAULT ('Activo');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Users') AND name = 'Certificates')
+    ALTER TABLE dbo.Users ADD Certificates NVARCHAR(MAX) NULL;
+GO
+
+-- Indices unicos condicionales (Username y DocumentId)
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_Username' AND object_id = OBJECT_ID(N'dbo.Users'))
+    CREATE UNIQUE INDEX IX_Users_Username ON dbo.Users (Username) WHERE Username IS NOT NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_DocumentId' AND object_id = OBJECT_ID(N'dbo.Users'))
+    CREATE UNIQUE INDEX IX_Users_DocumentId ON dbo.Users (DocumentId) WHERE DocumentId IS NOT NULL;
+GO
+
+PRINT 'Columnas extendidas de Users aplicadas.';
+GO
