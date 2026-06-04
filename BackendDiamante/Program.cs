@@ -130,7 +130,8 @@ builder.Services.AddScoped<IModulesLogic, ModulesLogic>();
 builder.Services.AddScoped<IAuthLogic,    AuthLogic>();
 builder.Services.AddScoped<IUsersLogic,       UsersLogic>();
 builder.Services.AddScoped<IEmailService,     EmailService>();
-builder.Services.AddScoped<ICostCentersLogic, CostCentersLogic>();
+builder.Services.AddScoped<ICostCentersLogic,     CostCentersLogic>();
+builder.Services.AddScoped<INotificationsLogic,  NotificationsLogic>();
 
 // ─────────────────────────────────────────────────────────────────────────────
 

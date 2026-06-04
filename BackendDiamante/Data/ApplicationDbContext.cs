@@ -24,6 +24,10 @@ public partial class ApplicationDbContext : DbContext
     public DbSet<RefreshToken>       RefreshTokens      { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
+    // ─── Notifications ─────────────────────────────────────────────────────────
+    public DbSet<Notification>     Notifications     { get; set; }
+    public DbSet<NotificationUser> NotificationUsers { get; set; }
+
     // ─── Business (Centros de Costo) ──────────────────────────────────────────
     public virtual DbSet<Company>             Companies             { get; set; }
     public virtual DbSet<Sector>              Sectors               { get; set; }
@@ -151,6 +155,44 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             entity.HasOne(e => e.User)
                   .WithMany(u => u.PasswordResetTokens)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ─── Notifications ────────────────────────────────────────────────────
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.ToTable("Notifications", "security");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Message).IsRequired().HasMaxLength(1000);
+            entity.Property(e => e.Type).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Severity).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasOne(e => e.CreatedByUser)
+                  .WithMany()
+                  .HasForeignKey(e => e.CreatedByUserId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<NotificationUser>(entity =>
+        {
+            entity.ToTable("NotificationUsers", "security");
+            entity.HasKey(e => e.Id);
+
+            entity.HasIndex(e => new { e.NotificationId, e.UserId }, "UQ_NotificationUsers").IsUnique();
+
+            entity.Property(e => e.IsRead).HasDefaultValue(false);
+
+            entity.HasOne(e => e.Notification)
+                  .WithMany(n => n.NotificationUsers)
+                  .HasForeignKey(e => e.NotificationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
