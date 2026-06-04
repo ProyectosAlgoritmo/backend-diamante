@@ -35,6 +35,8 @@ public partial class ApplicationDbContext : DbContext
     {
         modelBuilder.Entity<Module>(entity =>
         {
+            entity.ToTable("Modules", "security");
+
             entity.HasIndex(e => e.Code, "UQ_Modules_Code").IsUnique();
 
             entity.Property(e => e.Code).HasMaxLength(50);
@@ -45,6 +47,8 @@ public partial class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<Permission>(entity =>
         {
+            entity.ToTable("Permissions", "security");
+
             entity.HasIndex(e => e.Code, "UQ_Permissions_Code").IsUnique();
 
             entity.Property(e => e.Code).HasMaxLength(200);
@@ -60,6 +64,7 @@ public partial class ApplicationDbContext : DbContext
         // ─── Roles ────────────────────────────────────────────────────────────
         modelBuilder.Entity<Role>(entity =>
         {
+            entity.ToTable("Roles", "security");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.DeletedAt).HasColumnType("datetime");
             entity.Property(e => e.Description).HasMaxLength(500);
@@ -69,6 +74,8 @@ public partial class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<RolePermission>(entity =>
         {
+            entity.ToTable("RolePermissions", "security");
+
             entity.HasIndex(e => new { e.RoleId, e.PermissionId }, "UQ_RolePermissions_RolePermission").IsUnique();
 
             entity.Property(e => e.GrantedAt).HasDefaultValueSql("(getutcdate())");
@@ -86,6 +93,8 @@ public partial class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<Submodule>(entity =>
         {
+            entity.ToTable("Submodules", "security");
+
             entity.HasIndex(e => e.Code, "UQ_Submodules_Code").IsUnique();
 
             entity.Property(e => e.Code).HasMaxLength(100);
@@ -102,7 +111,7 @@ public partial class ApplicationDbContext : DbContext
         // ─── Users ────────────────────────────────────────────────────────────
         modelBuilder.Entity<User>(entity =>
         {
-            entity.ToTable("Users");
+            entity.ToTable("Users", "security");
             entity.HasKey(e => e.Id);
 
             // Campos originales (auth)
@@ -129,7 +138,7 @@ public partial class ApplicationDbContext : DbContext
         // ─── RefreshTokens ────────────────────────────────────────────────────
         modelBuilder.Entity<RefreshToken>(entity =>
         {
-            entity.ToTable("RefreshTokens");
+            entity.ToTable("RefreshTokens", "security");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Token).IsRequired().HasMaxLength(200);
             entity.HasIndex(e => e.Token).IsUnique();
@@ -143,7 +152,7 @@ public partial class ApplicationDbContext : DbContext
         // ─── PasswordResetTokens ─────────────────────────────────────────────
         modelBuilder.Entity<PasswordResetToken>(entity =>
         {
-            entity.ToTable("PasswordResetTokens");
+            entity.ToTable("PasswordResetTokens", "security");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Token).IsRequired().HasMaxLength(200);
             entity.HasIndex(e => e.Token).IsUnique();
