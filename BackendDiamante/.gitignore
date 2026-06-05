@@ -1,0 +1,72 @@
+# =========================
+# Visual Studio / Rider
+# =========================
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# =========================
+# Build outputs
+# =========================
+bin/
+obj/
+out/
+
+# =========================
+# .NET publish
+# =========================
+publish/
+wwwroot/
+
+# =========================
+# Secrets / Config (IMPORTANTE)
+# =========================
+appsettings.json
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Local.json
+
+# Si quieres permitir el template:
+!appsettings.Template.json
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Entity Framework
+# =========================
+*.db
+*.sqlite
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# .NET Core tools
+# =========================
+.project.lock.json
+.project.fragment.lock.json
+artifacts/
+
+# =========================
+# NuGet
+# =========================
+*.nupkg
+*.snupkg
+.nuget/
+
+# =========================
+# Rider / JetBrains
+# =========================
+.idea/
+
+
+Scripts/

@@ -8,4 +8,6 @@ public class RoleResponse
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public List<int> PermissionIds { get; set; } = [];
 }

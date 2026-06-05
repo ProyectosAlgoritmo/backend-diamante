@@ -1,12 +1,13 @@
 using BackendDiamante.Logic.Interfaces;
 using BackendDiamante.Models.DTOs.Roles;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using BackendDiamante.Security;
 
 namespace BackendDiamante.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class RolesController : ControllerBase
+[Authorize]
+public class RolesController : BaseController
 {
     private readonly IRolesLogic _rolesLogic;
 
@@ -16,40 +17,53 @@ public class RolesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<RoleResponse>>> GetAll()
+    [RequirePermission("SECURITY.ROLES.VIEW")]
+    public async Task<IActionResult> GetAll()
     {
         var roles = await _rolesLogic.GetAllAsync();
-        return Ok(roles);
+        return Success(roles);
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<RoleResponse>> GetById(int id)
+    [HttpGet("stats")]
+    [RequirePermission("SECURITY.ROLES.VIEW")]
+    public async Task<IActionResult> GetStats()
+    {
+        var stats = await _rolesLogic.GetStatsAsync();
+        return Success(stats);
+    }
+
+    [HttpGet("{id:int}")]
+    [RequirePermission("SECURITY.ROLES.VIEW")]
+    public async Task<IActionResult> GetById(int id)
     {
         var role = await _rolesLogic.GetByIdAsync(id);
-        if (role is null) return NotFound();
-        return Ok(role);
+        if (role is null) return Error("Rol no encontrado", 404);
+        return Success(role);
     }
 
     [HttpPost]
-    public async Task<ActionResult<RoleResponse>> Create([FromBody] CreateRoleRequest request)
+    [RequirePermission("SECURITY.ROLES.CREATE")]
+    public async Task<IActionResult> Create([FromBody] CreateRoleRequest request)
     {
         var role = await _rolesLogic.CreateAsync(request);
-        return CreatedAtAction(nameof(GetById), new { id = role.Id }, role);
+        return Success(role, "Rol creado correctamente");
     }
 
-    [HttpPut("{id}")]
-    public async Task<ActionResult<RoleResponse>> Update(int id, [FromBody] UpdateRoleRequest request)
+    [HttpPut("{id:int}")]
+    [RequirePermission("SECURITY.ROLES.EDIT")]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateRoleRequest request)
     {
         var role = await _rolesLogic.UpdateAsync(id, request);
-        if (role is null) return NotFound();
-        return Ok(role);
+        if (role is null) return Error("Rol no encontrado", 404);
+        return Success(role, "Rol actualizado correctamente");
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:int}")]
+    [RequirePermission("SECURITY.ROLES.DELETE")]
     public async Task<IActionResult> Delete(int id)
     {
         var deleted = await _rolesLogic.DeleteAsync(id);
-        if (!deleted) return NotFound();
-        return NoContent();
+        if (!deleted) return Error("Rol no encontrado", 404);
+        return Success(new { }, "Rol eliminado correctamente");
     }
 }

@@ -10,4 +10,6 @@ public class CreateRoleRequest
 
     [StringLength(500, ErrorMessage = "La descripción no puede exceder 500 caracteres")]
     public string? Description { get; set; }
+
+    public List<int> PermissionIds { get; set; } = [];
 }

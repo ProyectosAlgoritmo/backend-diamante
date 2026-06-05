@@ -17,14 +17,21 @@ public class RolesLogic : IRolesLogic
 
     public async Task<List<RoleResponse>> GetAllAsync()
     {
-        return await _context.Roles
-            .Select(r => MapToResponse(r))
+        var roles = await _context.Roles
+            .Include(r => r.RolePermissions)
+            .Where(r => r.DeletedAt == null)
+            .OrderBy(r => r.Id)
             .ToListAsync();
+
+        return roles.Select(MapToResponse).ToList();
     }
 
     public async Task<RoleResponse?> GetByIdAsync(int id)
     {
-        var role = await _context.Roles.FindAsync(id);
+        var role = await _context.Roles
+            .Include(r => r.RolePermissions)
+            .FirstOrDefaultAsync(r => r.Id == id && r.DeletedAt == null);
+
         return role is null ? null : MapToResponse(role);
     }
 
@@ -32,54 +39,119 @@ public class RolesLogic : IRolesLogic
     {
         var role = new Role
         {
-            Name = request.Name,
+            Name        = request.Name,
             Description = request.Description,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow
+            IsActive    = true,
+            CreatedAt   = DateTime.UtcNow,
         };
 
         _context.Roles.Add(role);
         await _context.SaveChangesAsync();
 
-        return MapToResponse(role);
+        if (request.PermissionIds.Count > 0)
+            await SyncPermissionsAsync(role.Id, request.PermissionIds);
+
+        return await GetByIdAsync(role.Id) ?? MapToResponse(role);
     }
 
     public async Task<RoleResponse?> UpdateAsync(int id, UpdateRoleRequest request)
     {
-        var role = await _context.Roles.FindAsync(id);
+        var role = await _context.Roles
+            .Include(r => r.RolePermissions)
+            .FirstOrDefaultAsync(r => r.Id == id && r.DeletedAt == null);
+
         if (role is null) return null;
 
-        if (request.Name is not null) role.Name = request.Name;
+        if (request.Name        is not null) role.Name        = request.Name;
         if (request.Description is not null) role.Description = request.Description;
-        if (request.IsActive.HasValue) role.IsActive = request.IsActive.Value;
+        if (request.IsActive.HasValue)       role.IsActive     = request.IsActive.Value;
         role.UpdatedAt = DateTime.UtcNow;
+
+        if (request.PermissionIds is not null)
+            await SyncPermissionsAsync(role.Id, request.PermissionIds);
 
         await _context.SaveChangesAsync();
 
-        return MapToResponse(role);
+        return await GetByIdAsync(role.Id);
     }
 
+    /// <summary>
+    /// Soft delete — sets DeletedAt, marks IsActive = false,
+    /// removes all role permissions, and does NOT remove the row.
+    /// </summary>
     public async Task<bool> DeleteAsync(int id)
     {
-        var role = await _context.Roles.FindAsync(id);
+        var role = await _context.Roles
+            .FirstOrDefaultAsync(r => r.Id == id && r.DeletedAt == null);
+
         if (role is null) return false;
 
-        _context.Roles.Remove(role);
+        // Remove all permissions assigned to this role
+        var rolePermissions = await _context.RolePermissions
+            .Where(rp => rp.RoleId == id)
+            .ToListAsync();
+
+        _context.RolePermissions.RemoveRange(rolePermissions);
+
+        role.DeletedAt = DateTime.UtcNow;
+        role.IsActive  = false;
+        role.UpdatedAt = DateTime.UtcNow;
+
         await _context.SaveChangesAsync();
 
         return true;
     }
 
-    private static RoleResponse MapToResponse(Role role)
+    public async Task<RoleStatsResponse> GetStatsAsync()
     {
-        return new RoleResponse
+        var total  = await _context.Roles.CountAsync(r => r.DeletedAt == null);
+        var active = await _context.Roles.CountAsync(r => r.DeletedAt == null && r.IsActive);
+
+        return new RoleStatsResponse
         {
-            Id = role.Id,
-            Name = role.Name,
-            Description = role.Description,
-            IsActive = role.IsActive,
-            CreatedAt = role.CreatedAt,
-            UpdatedAt = role.UpdatedAt
+            Total         = total,
+            ActiveCount   = active,
+            InactiveCount = total - active,
         };
     }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private async Task SyncPermissionsAsync(int roleId, List<int> permissionIds)
+    {
+        var existing = await _context.RolePermissions
+            .Where(rp => rp.RoleId == roleId)
+            .ToListAsync();
+
+        _context.RolePermissions.RemoveRange(existing);
+
+        var validIds = await _context.Permissions
+            .Where(p => permissionIds.Contains(p.Id))
+            .Select(p => p.Id)
+            .ToListAsync();
+
+        foreach (var permId in validIds)
+        {
+            _context.RolePermissions.Add(new RolePermission
+            {
+                RoleId       = roleId,
+                PermissionId = permId,
+                GrantedAt    = DateTime.UtcNow,
+            });
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    private static RoleResponse MapToResponse(Role role) => new()
+    {
+        Id            = role.Id,
+        Name          = role.Name,
+        Description   = role.Description,
+        IsActive      = role.IsActive,
+        CreatedAt     = role.CreatedAt,
+        UpdatedAt     = role.UpdatedAt,
+        DeletedAt     = role.DeletedAt,
+        PermissionIds = role.RolePermissions.Select(rp => rp.PermissionId).ToList(),
+    };
 }

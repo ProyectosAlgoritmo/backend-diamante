@@ -9,4 +9,5 @@ public interface IRolesLogic
     Task<RoleResponse> CreateAsync(CreateRoleRequest request);
     Task<RoleResponse?> UpdateAsync(int id, UpdateRoleRequest request);
     Task<bool> DeleteAsync(int id);
+    Task<RoleStatsResponse> GetStatsAsync();
 }
