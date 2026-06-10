@@ -139,6 +139,21 @@ public class AuthController : ControllerBase
         return Ok(new { message = "Contrasena actualizada exitosamente." });
     }
 
+    // POST api/auth/change-password (requiere JWT válido)
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                     ?? User.FindFirstValue("sub");
+
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { message = "Token invalido" });
+
+        await _authLogic.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
+        return Ok(new { message = "Contrasena actualizada exitosamente." });
+    }
+
     // ─── Helper ───────────────────────────────────────────────────────────────
 
     private string GetIpAddress() =>

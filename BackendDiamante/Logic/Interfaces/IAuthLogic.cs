@@ -15,4 +15,7 @@ public interface IAuthLogic
     Task ForgotPasswordAsync(string email, string frontendBaseUrl);
     Task<ValidateResetTokenResponse> ValidateResetTokenAsync(string token);
     Task ResetPasswordAsync(string token, string newPassword);
+
+    // ─── Change Password (primer inicio de sesion) ──────────────────────────
+    Task ChangePasswordAsync(int userId, string currentPassword, string newPassword);
 }

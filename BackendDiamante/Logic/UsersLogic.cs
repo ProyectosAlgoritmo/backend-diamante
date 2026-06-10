@@ -10,6 +10,8 @@ namespace BackendDiamante.Logic;
 public class UsersLogic : IUsersLogic
 {
     private readonly ApplicationDbContext _context;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<UsersLogic> _logger;
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>Roles protegidos que no se pueden asignar, editar ni eliminar desde el modulo Usuarios.</summary>
@@ -19,9 +21,11 @@ public class UsersLogic : IUsersLogic
         "Administrador",
     };
 
-    public UsersLogic(ApplicationDbContext context)
+    public UsersLogic(ApplicationDbContext context, IEmailService emailService, ILogger<UsersLogic> logger)
     {
         _context = context;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     /// <summary>Determina si un usuario tiene un rol protegido.</summary>
@@ -32,15 +36,15 @@ public class UsersLogic : IUsersLogic
     private static bool IsProtectedRole(string? role) =>
         !string.IsNullOrWhiteSpace(role) && ProtectedRoles.Contains(role.Trim());
 
-    // ── GET ALL (excluye usuarios admin) ─────────────────────────────────────
-    public async Task<List<UserResponse>> GetAllAsync()
+    // ── GET ALL (excluye usuarios admin y al usuario actual) ───────────────
+    public async Task<List<UserResponse>> GetAllAsync(int currentUserId)
     {
         var users = await _context.Users
             .OrderByDescending(u => u.CreatedAt)
             .ToListAsync();
 
         return users
-            .Where(u => !IsProtectedUser(u))
+            .Where(u => !IsProtectedUser(u) && u.Id != currentUserId)
             .Select(MapToResponse)
             .ToList();
     }
@@ -106,13 +110,29 @@ public class UsersLogic : IUsersLogic
             Role         = request.Role.Trim(),
             Status       = status,
             IsActive     = status == "Activo",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
-            Certificates = SerializeCertificates(request.Certificates),
-            CreatedAt    = DateTime.UtcNow,
+            PasswordHash       = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
+            MustChangePassword = true,
+            Certificates       = SerializeCertificates(request.Certificates),
+            CreatedAt          = DateTime.UtcNow,
         };
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
+
+        try
+        {
+            var displayUsername = user.Username ?? user.Email.Split('@')[0];
+            await _emailService.SendWelcomeEmailAsync(
+                user.Email,
+                $"{user.FirstName} {user.LastName}".Trim(),
+                displayUsername,
+                password
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "No se pudo enviar correo de bienvenida a {Email}. El usuario fue creado correctamente.", user.Email);
+        }
 
         return MapToResponse(user);
     }
@@ -180,9 +200,12 @@ public class UsersLogic : IUsersLogic
         return MapToResponse(user);
     }
 
-    // ── DELETE (bloquea eliminacion de admin) ────────────────────────────────
-    public async Task<bool> DeleteAsync(int id)
+    // ── DELETE (bloquea eliminacion de admin y auto-eliminacion) ────────────
+    public async Task<bool> DeleteAsync(int id, int currentUserId)
     {
+        if (id == currentUserId)
+            throw new InvalidOperationException("No puedes eliminarte a ti mismo.");
+
         var user = await _context.Users.FindAsync(id);
         if (user is null) return false;
 

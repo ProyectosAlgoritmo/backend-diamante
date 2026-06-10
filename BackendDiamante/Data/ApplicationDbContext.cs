@@ -136,6 +136,7 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.DocumentId).HasMaxLength(30);
             entity.HasIndex(e => e.DocumentId).IsUnique().HasFilter("[DocumentId] IS NOT NULL");
             entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("Activo");
+            entity.Property(e => e.MustChangePassword).HasDefaultValue(false);
             entity.Property(e => e.Certificates).HasColumnType("NVARCHAR(MAX)");
         });
 

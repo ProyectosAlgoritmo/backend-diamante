@@ -63,10 +63,6 @@ public class AuthLogic : IAuthLogic
         var identifier = request.Email.Trim();
         var isEmail = identifier.Contains('@');
 
-        // Solo validar dominio si es un correo electronico
-        if (isEmail)
-            ValidateDomain(identifier.ToLower());
-
         // Buscar por email o por username
         User? user;
         if (isEmail)
@@ -172,14 +168,12 @@ public class AuthLogic : IAuthLogic
         if (userInfo is null || string.IsNullOrEmpty(userInfo.Email))
             throw new UnauthorizedAccessException("Token de Google no contiene información de usuario");
 
-        ValidateDomain(userInfo.Email);
-
         // Buscar usuario existente — NO crear automaticamente
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email.ToLower() == userInfo.Email.Trim().ToLower());
 
         if (user is null)
-            throw new UnauthorizedAccessException("Usuario no autorizado");
+            throw new UnauthorizedAccessException("Usuario no autorizado. Tu cuenta debe estar registrada en la plataforma.");
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
@@ -237,14 +231,12 @@ public class AuthLogic : IAuthLogic
         if (userInfo is null || string.IsNullOrEmpty(email))
             throw new UnauthorizedAccessException("Token de Microsoft no contiene informacion de usuario");
 
-        ValidateDomain(email);
-
         // Buscar usuario existente — NO crear automaticamente
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email.ToLower() == email.Trim().ToLower());
 
         if (user is null)
-            throw new UnauthorizedAccessException("Usuario no autorizado");
+            throw new UnauthorizedAccessException("Usuario no autorizado. Tu cuenta debe estar registrada en la plataforma.");
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta esta desactivada. Contacta al administrador.");
@@ -389,6 +381,25 @@ public class AuthLogic : IAuthLogic
         _logger.LogInformation("Contrasena actualizada exitosamente para usuario {UserId}", resetToken.UserId);
     }
 
+    // ─── Change Password ──────────────────────────────────────────────────────
+
+    public async Task ChangePasswordAsync(int userId, string currentPassword, string newPassword)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user is null)
+            throw new InvalidOperationException("Usuario no encontrado.");
+
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+            throw new InvalidOperationException("La contrasena actual es incorrecta.");
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword, workFactor: 12);
+        user.MustChangePassword = false;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Contrasena cambiada exitosamente para usuario {UserId}", userId);
+    }
+
     // ─── Private Helpers ──────────────────────────────────────────────────────
 
     private string GenerateAccessToken(User user)
@@ -467,6 +478,7 @@ public class AuthLogic : IAuthLogic
         Name = user.Name,
         Role = user.Role,
         Permissions = await GetPermissionsByRoleAsync(user.Role),
+        MustChangePassword = user.MustChangePassword,
     };
 
     private Task<List<string>> GetPermissionsByRoleAsync(string roleName) =>

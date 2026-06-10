@@ -20,6 +20,7 @@ public class User
     public string? Phone { get; set; }
     public string? DocumentId { get; set; }
     public string Status { get; set; } = "Activo";
+    public bool MustChangePassword { get; set; }
     /// <summary>Certificados almacenados como JSON array (ej: ["Cert1","Cert2"])</summary>
     public string? Certificates { get; set; }
 
