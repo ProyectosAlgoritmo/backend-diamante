@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using BackendDiamante.Data;
+using BackendDiamante.Data.Seeders;
 using BackendDiamante.Logic;
 using BackendDiamante.Logic.Interfaces;
 using BackendDiamante.Middleware;
@@ -13,7 +14,6 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ─── Controllers + Swagger ────────────────────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -37,25 +37,23 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// ─── Base de datos ────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// ─── JWT Authentication ───────────────────────────────────────────────────────
 var jwtSecret = builder.Configuration["Jwt:Secret"]!;
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer           = true,
-            ValidateAudience         = true,
-            ValidateLifetime         = true,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer              = builder.Configuration["Jwt:Issuer"],
-            ValidAudience            = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-            ClockSkew                = TimeSpan.Zero,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ClockSkew = TimeSpan.Zero,
         };
         options.Events = new JwtBearerEvents
         {
@@ -91,15 +89,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// ─── Rate Limiting (protección brute force en login) ─────────────────────────
 builder.Services.AddRateLimiter(options =>
 {
     options.AddFixedWindowLimiter("login", limiterOptions =>
     {
-        limiterOptions.PermitLimit            = 5;
-        limiterOptions.Window                 = TimeSpan.FromMinutes(1);
-        limiterOptions.QueueProcessingOrder   = QueueProcessingOrder.OldestFirst;
-        limiterOptions.QueueLimit             = 0;
+        limiterOptions.PermitLimit = 5;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0;
     });
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.OnRejected = async (context, _) =>
@@ -110,7 +107,6 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
-// ─── CORS ─────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -121,30 +117,21 @@ builder.Services.AddCors(options =>
     });
 });
 
-// ─── HttpClient (para validación de tokens Google vía userinfo endpoint) ──────
 builder.Services.AddHttpClient();
 
-// ─── Servicios de negocio ─────────────────────────────────────────────────────
-builder.Services.AddScoped<IRolesLogic,   RolesLogic>();
+builder.Services.AddScoped<IRolesLogic, RolesLogic>();
 builder.Services.AddScoped<IModulesLogic, ModulesLogic>();
-builder.Services.AddScoped<IAuthLogic,    AuthLogic>();
-builder.Services.AddScoped<IUsersLogic,       UsersLogic>();
-builder.Services.AddScoped<IEmailService,     EmailService>();
-builder.Services.AddScoped<ICostCentersLogic,     CostCentersLogic>();
-builder.Services.AddScoped<INotificationsLogic,  NotificationsLogic>();
-
-// ─────────────────────────────────────────────────────────────────────────────
+builder.Services.AddScoped<IAuthLogic, AuthLogic>();
+builder.Services.AddScoped<IUsersLogic, UsersLogic>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ICostCentersLogic, CostCentersLogic>();
+builder.Services.AddScoped<INotificationsLogic, NotificationsLogic>();
 
 var app = builder.Build();
 
-// ─── Seed usuarios por defecto (solo si no existen) ──────────────────────────
-await SeedDefaultUsersAsync(app);
+await SeedStartupDataAsync(app);
 
-// ─── Middleware Pipeline ──────────────────────────────────────────────────────
-
-// Manejo global de excepciones — debe ser el primero
 app.UseMiddleware<GlobalExceptionMiddleware>();
-
 
 if (app.Environment.IsDevelopment())
 {
@@ -152,14 +139,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// HTTPS solo en producción — localmente no hay certificado configurado
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
-// CORS antes de todo — garantiza headers en TODAS las respuestas (incluidos errores)
 app.UseCors("AllowAll");
 
-// Manejo global de excepciones — después de CORS para que los errores incluyan los headers
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.UseRateLimiter();
@@ -170,34 +154,39 @@ app.MapControllers();
 
 app.Run();
 
-// ─── Seed Helper ─────────────────────────────────────────────────────────────
-static async Task SeedDefaultUsersAsync(WebApplication app)
+static async Task SeedStartupDataAsync(WebApplication app)
 {
     using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
     try
     {
         await context.Database.EnsureCreatedAsync();
-
-        if (!await context.Users.AnyAsync())
-        {
-            var users = new List<User>
-            {
-                new() { Email = "admin@diamante.co",      Name = "Administrador Diamante", Role = "admin",      PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!")   },
-                new() { Email = "supervisor@diamante.co", Name = "Supervisor Diamante",    Role = "supervisor", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Super123!")   },
-                new() { Email = "cliente@diamante.co",    Name = "Cliente Diamante",       Role = "cliente",    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Cliente123!") },
-            };
-            context.Users.AddRange(users);
-            await context.SaveChangesAsync();
-
-            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("✅ Usuarios de prueba creados: admin, supervisor, cliente");
-        }
+        await SecurityModulesSeed.SeedAsync(context, logger);
+        await SecurityRolesSeed.SeedAsync(context, logger);
+        await SeedDefaultUsersAsync(context, logger);
     }
     catch (Exception ex)
     {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "❌ Error durante el seed de usuarios");
+        logger.LogError(ex, "Error durante el seed de arranque");
+    }
+}
+
+static async Task SeedDefaultUsersAsync(ApplicationDbContext context, ILogger logger)
+{
+    if (!await context.Users.AnyAsync())
+    {
+        var users = new List<User>
+        {
+            new() { Email = "admin@diamante.co",      Name = "Administrador Diamante", Role = "admin",      PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!")   },
+            new() { Email = "supervisor@diamante.co", Name = "Supervisor Diamante",    Role = "supervisor", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Super123!")   },
+            new() { Email = "cliente@diamante.co",    Name = "Cliente Diamante",       Role = "cliente",    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Cliente123!") },
+        };
+
+        context.Users.AddRange(users);
+        await context.SaveChangesAsync();
+
+        logger.LogInformation("Usuarios de prueba creados: admin, supervisor, cliente");
     }
 }

@@ -9,6 +9,7 @@ public static class RoleNameResolver
         {
             ["admin"] = AdministratorRoleName,
             ["cliente"] = "Cliente",
+            ["operario"] = "Operario",
             ["supervisor"] = "Supervisor",
         };
 
