@@ -159,12 +159,15 @@ public static class SecurityModulesSeed
         ILogger logger,
         CancellationToken cancellationToken)
     {
+        // Carga todo de una vez — sin N+1 queries
         var modules = await context.Modules
             .Include(module => module.Submodules)
                 .ThenInclude(submodule => submodule.Permissions)
             .ToListAsync(cancellationToken);
 
-        var modulesByCode = modules.ToDictionary(module => module.Code, StringComparer.OrdinalIgnoreCase);
+        var modulesByCode    = modules.ToDictionary(m => m.Code, StringComparer.OrdinalIgnoreCase);
+        var submodulesByCode = modules.SelectMany(m => m.Submodules)
+                                      .ToDictionary(s => s.Code, StringComparer.OrdinalIgnoreCase);
 
         foreach (var moduleDefinition in CanonicalModules)
         {
@@ -172,9 +175,9 @@ public static class SecurityModulesSeed
             {
                 module = new Module
                 {
-                    Name = moduleDefinition.Name,
-                    Code = moduleDefinition.Code,
-                    IsActive = true,
+                    Name      = moduleDefinition.Name,
+                    Code      = moduleDefinition.Code,
+                    IsActive  = true,
                     CreatedAt = DateTime.UtcNow,
                 };
 
@@ -187,7 +190,7 @@ public static class SecurityModulesSeed
             else if (!module.IsActive || !string.Equals(module.Name, moduleDefinition.Name, StringComparison.Ordinal))
             {
                 module.IsActive = true;
-                module.Name = moduleDefinition.Name;
+                module.Name     = moduleDefinition.Name;
                 await context.SaveChangesAsync(cancellationToken);
 
                 logger.LogInformation("Modulo de seguridad normalizado: {ModuleCode}", module.Code);
@@ -195,57 +198,45 @@ public static class SecurityModulesSeed
 
             foreach (var submoduleDefinition in moduleDefinition.Submodules)
             {
-                var submodule = await context.Submodules
-                    .Include(item => item.Permissions)
-                    .FirstOrDefaultAsync(item => item.Code == submoduleDefinition.Code, cancellationToken);
-
-                if (submodule is null)
+                // Usa el diccionario en memoria — evita query individual por submódulo
+                if (!submodulesByCode.TryGetValue(submoduleDefinition.Code, out var submodule))
                 {
                     submodule = new Submodule
                     {
-                        Name = submoduleDefinition.Name,
-                        Code = submoduleDefinition.Code,
-                        ModuleId = module.Id,
-                        IsActive = true,
+                        Name      = submoduleDefinition.Name,
+                        Code      = submoduleDefinition.Code,
+                        ModuleId  = module.Id,
+                        IsActive  = true,
                         CreatedAt = DateTime.UtcNow,
                     };
 
                     context.Submodules.Add(submodule);
                     await context.SaveChangesAsync(cancellationToken);
 
+                    submodulesByCode[submodule.Code] = submodule;
                     logger.LogInformation("Submodulo de seguridad creado: {SubmoduleCode}", submodule.Code);
                 }
                 else
                 {
-                    var submoduleChanged = false;
+                    var changed = false;
 
-                    if (!submodule.IsActive)
-                    {
-                        submodule.IsActive = true;
-                        submoduleChanged = true;
-                    }
+                    if (!submodule.IsActive)                                                           { submodule.IsActive   = true;          changed = true; }
+                    if (!string.Equals(submodule.Name, submoduleDefinition.Name, StringComparison.Ordinal)) { submodule.Name  = submoduleDefinition.Name; changed = true; }
+                    if (submodule.ModuleId != module.Id)                                               { submodule.ModuleId   = module.Id;     changed = true; }
 
-                    if (!string.Equals(submodule.Name, submoduleDefinition.Name, StringComparison.Ordinal))
-                    {
-                        submodule.Name = submoduleDefinition.Name;
-                        submoduleChanged = true;
-                    }
-
-                    if (submodule.ModuleId != module.Id)
-                    {
-                        submodule.ModuleId = module.Id;
-                        submoduleChanged = true;
-                    }
-
-                    if (submoduleChanged)
+                    if (changed)
                     {
                         await context.SaveChangesAsync(cancellationToken);
                         logger.LogInformation("Submodulo de seguridad normalizado: {SubmoduleCode}", submodule.Code);
                     }
                 }
 
+                // Usa la colección ya cargada — evita N queries individuales por permiso
+                var permissionsByCode = submodule.Permissions
+                    .ToDictionary(p => p.Code, StringComparer.OrdinalIgnoreCase);
+
                 foreach (var permissionDefinition in submoduleDefinition.Permissions)
-                    await EnsurePermissionAsync(context, submodule.Id, permissionDefinition, logger, cancellationToken);
+                    await EnsurePermissionAsync(context, submodule, permissionsByCode, permissionDefinition, logger, cancellationToken);
             }
         }
 
@@ -254,34 +245,36 @@ public static class SecurityModulesSeed
 
     private static async Task EnsurePermissionAsync(
         ApplicationDbContext context,
-        int submoduleId,
+        Submodule submodule,
+        Dictionary<string, Permission> permissionsByCode,
         PermissionDefinition permissionDefinition,
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        var permission = await context.Permissions
-            .FirstOrDefaultAsync(item => item.Code == permissionDefinition.Code, cancellationToken);
-
-        if (permission is null)
+        if (!permissionsByCode.TryGetValue(permissionDefinition.Code, out var permission))
         {
-            context.Permissions.Add(new Permission
+            permission = new Permission
             {
-                Name = permissionDefinition.Name,
-                Code = permissionDefinition.Code,
-                SubmoduleId = submoduleId,
-                CreatedAt = DateTime.UtcNow,
-            });
+                Name       = permissionDefinition.Name,
+                Code       = permissionDefinition.Code,
+                SubmoduleId = submodule.Id,
+                CreatedAt  = DateTime.UtcNow,
+            };
 
+            context.Permissions.Add(permission);
             await context.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Permiso de seguridad creado: {PermissionCode}", permissionDefinition.Code);
+
+            permissionsByCode[permission.Code] = permission;
+            submodule.Permissions.Add(permission);
+            logger.LogInformation("Permiso de seguridad creado: {PermissionCode}", permission.Code);
             return;
         }
 
-        if (permission.SubmoduleId != submoduleId ||
+        if (permission.SubmoduleId != submodule.Id ||
             !string.Equals(permission.Name, permissionDefinition.Name, StringComparison.Ordinal))
         {
-            permission.SubmoduleId = submoduleId;
-            permission.Name = permissionDefinition.Name;
+            permission.SubmoduleId = submodule.Id;
+            permission.Name        = permissionDefinition.Name;
 
             await context.SaveChangesAsync(cancellationToken);
             logger.LogInformation("Permiso de seguridad normalizado: {PermissionCode}", permission.Code);

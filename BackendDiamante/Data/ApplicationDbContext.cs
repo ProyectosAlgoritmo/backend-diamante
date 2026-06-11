@@ -74,6 +74,7 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.Name).HasMaxLength(100);
+            entity.HasIndex(e => e.Name, "IX_Roles_Name");
         });
 
         modelBuilder.Entity<RolePermission>(entity =>
