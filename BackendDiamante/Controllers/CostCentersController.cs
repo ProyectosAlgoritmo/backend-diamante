@@ -19,7 +19,7 @@ public class CostCentersController : BaseController
     // ─── Cost Centers ─────────────────────────────────────────────────────────
 
     [HttpGet]
-    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.VIEW")]
+    [RequirePermission("BUSINESS.COST_CENTERS.VIEW")]
     public async Task<IActionResult> GetAll()
     {
         var list = await _logic.GetAllAsync();
@@ -27,7 +27,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpGet("stats")]
-    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.VIEW")]
+    [RequirePermission("BUSINESS.COST_CENTERS.VIEW")]
     public async Task<IActionResult> GetStats()
     {
         var stats = await _logic.GetStatsAsync();
@@ -35,7 +35,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpGet("{id:int}")]
-    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.VIEW")]
+    [RequirePermission("BUSINESS.COST_CENTERS.VIEW")]
     public async Task<IActionResult> GetById(int id)
     {
         var cc = await _logic.GetByIdAsync(id);
@@ -44,7 +44,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpPost]
-    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.CREATE")]
+    [RequirePermission("BUSINESS.COST_CENTERS.CREATE")]
     public async Task<IActionResult> Create([FromBody] CreateCostCenterRequest request)
     {
         var cc = await _logic.CreateAsync(request);
@@ -52,7 +52,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpPut("{id:int}")]
-    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.EDIT")]
+    [RequirePermission("BUSINESS.COST_CENTERS.EDIT")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCostCenterRequest request)
     {
         var cc = await _logic.UpdateAsync(id, request);
@@ -61,7 +61,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpDelete("{id:int}")]
-    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.DELETE")]
+    [RequirePermission("BUSINESS.COST_CENTERS.DELETE")]
     public async Task<IActionResult> Delete(int id)
     {
         var deleted = await _logic.DeleteAsync(id);
@@ -70,7 +70,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpPatch("{id:int}/toggle-status")]
-    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.EDIT")]
+    [RequirePermission("BUSINESS.COST_CENTERS.EDIT")]
     public async Task<IActionResult> ToggleStatus(int id)
     {
         var toggled = await _logic.ToggleStatusAsync(id);
@@ -81,7 +81,7 @@ public class CostCentersController : BaseController
     // ─── Operators ────────────────────────────────────────────────────────────
 
     [HttpGet("operators")]
-    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.VIEW")]
+    [RequirePermission("BUSINESS.STAFF_ASSIGNMENT.VIEW")]
     public async Task<IActionResult> GetAllOperators()
     {
         var operators = await _logic.GetAllOperatorsAsync();
@@ -89,7 +89,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpGet("operators/{id:int}")]
-    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.VIEW")]
+    [RequirePermission("BUSINESS.STAFF_ASSIGNMENT.VIEW")]
     public async Task<IActionResult> GetOperatorById(int id)
     {
         var op = await _logic.GetOperatorByIdAsync(id);
@@ -98,7 +98,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpPost("operators")]
-    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.CREATE")]
+    [RequirePermission("BUSINESS.STAFF_ASSIGNMENT.CREATE")]
     public async Task<IActionResult> CreateOperator([FromBody] CreateOperatorRequest request)
     {
         var op = await _logic.CreateOperatorAsync(request);
@@ -106,7 +106,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpPut("operators/{id:int}")]
-    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.EDIT")]
+    [RequirePermission("BUSINESS.STAFF_ASSIGNMENT.EDIT")]
     public async Task<IActionResult> UpdateOperator(int id, [FromBody] UpdateOperatorRequest request)
     {
         var op = await _logic.UpdateOperatorAsync(id, request);
@@ -115,7 +115,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpDelete("operators/{id:int}")]
-    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.DELETE")]
+    [RequirePermission("BUSINESS.STAFF_ASSIGNMENT.DELETE")]
     public async Task<IActionResult> DeleteOperator(int id)
     {
         var deleted = await _logic.DeleteOperatorAsync(id);
@@ -126,7 +126,7 @@ public class CostCentersController : BaseController
     // ─── Assignments ──────────────────────────────────────────────────────────
 
     [HttpPost("{id:int}/operators")]
-    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.CREATE")]
+    [RequirePermission("BUSINESS.STAFF_ASSIGNMENT.CREATE")]
     public async Task<IActionResult> AssignOperator(int id, [FromBody] AssignOperatorRequest request)
     {
         await _logic.AssignOperatorAsync(id, request.OperatorId);
@@ -134,7 +134,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpDelete("{id:int}/operators/{operatorId:int}")]
-    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.DELETE")]
+    [RequirePermission("BUSINESS.STAFF_ASSIGNMENT.DELETE")]
     public async Task<IActionResult> UnassignOperator(int id, int operatorId)
     {
         var removed = await _logic.UnassignOperatorAsync(id, operatorId);
@@ -145,7 +145,7 @@ public class CostCentersController : BaseController
     // ─── Support data ─────────────────────────────────────────────────────────
 
     [HttpGet("companies")]
-    [RequirePermission("OPERATIONAL_CONTROL.COST_CENTERS.VIEW")]
+    [RequirePermission("BUSINESS.COST_CENTERS.VIEW")]
     public async Task<IActionResult> GetCompanies()
     {
         var companies = await _logic.GetAllCompaniesAsync();
@@ -153,7 +153,7 @@ public class CostCentersController : BaseController
     }
 
     [HttpGet("sectors")]
-    [RequirePermission("OPERATIONAL_CONTROL.STAFF_ASSIGNMENT.VIEW")]
+    [RequirePermission("BUSINESS.STAFF_ASSIGNMENT.VIEW")]
     public async Task<IActionResult> GetSectors()
     {
         var sectors = await _logic.GetAllSectorsAsync();
