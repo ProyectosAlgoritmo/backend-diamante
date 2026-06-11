@@ -90,6 +90,15 @@ public static class SecurityModulesSeed
                         new("Editar", "BUSINESS.STAFF_ASSIGNMENT.EDIT"),
                         new("Eliminar", "BUSINESS.STAFF_ASSIGNMENT.DELETE"),
                     ]),
+                new(
+                    "Dimensionamientos",
+                    "BUSINESS.SIZING",
+                    [
+                        new("Ver", "BUSINESS.SIZING.VIEW"),
+                        new("Crear", "BUSINESS.SIZING.CREATE"),
+                        new("Editar", "BUSINESS.SIZING.EDIT"),
+                        new("Eliminar", "BUSINESS.SIZING.DELETE"),
+                    ]),
             ]),
     ];
 
@@ -125,7 +134,6 @@ public static class SecurityModulesSeed
 
     private static readonly string[] ObsoleteSubmoduleCodes =
     [
-        "BUSINESS.SIZING",
         "SECURITY.EVENT_VIEWER",
         "OPERATIONAL_CONTROL.COMPANIES",
         "OPERATIONAL_CONTROL.COST_CENTERS",
@@ -134,7 +142,6 @@ public static class SecurityModulesSeed
 
     private static readonly string[] ObsoletePermissionPrefixes =
     [
-        "BUSINESS.SIZING.",
         "OPERATIONAL_CONTROL.",
         "SECURITY.CLIENTS.",
         "SECURITY.EVENT_VIEWER.",
@@ -145,6 +152,12 @@ public static class SecurityModulesSeed
         ILogger logger,
         CancellationToken cancellationToken = default)
     {
+        if (await IsCatalogUpToDateAsync(context, cancellationToken))
+        {
+            logger.LogDebug("Catalogo de seguridad ya actualizado. Seed omitido.");
+            return;
+        }
+
         var modulesByCode = await EnsureCanonicalStructureAsync(context, logger, cancellationToken);
         var permissionsByCode = await context.Permissions
             .ToDictionaryAsync(permission => permission.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
@@ -152,6 +165,30 @@ public static class SecurityModulesSeed
         await MigrateLegacyRolePermissionsAsync(context, permissionsByCode, logger, cancellationToken);
         await RemoveObsoleteCatalogAsync(context, logger, cancellationToken);
         await ReactivateCanonicalModulesAsync(context, modulesByCode, logger, cancellationToken);
+    }
+
+    private static async Task<bool> IsCatalogUpToDateAsync(
+        ApplicationDbContext context,
+        CancellationToken ct)
+    {
+        // Si algún módulo/submódulo obsoleto sigue en la DB, hay que limpiar
+        if (await context.Modules.AnyAsync(m => ObsoleteModuleCodes.Contains(m.Code), ct))
+            return false;
+
+        if (await context.Submodules.AnyAsync(s => ObsoleteSubmoduleCodes.Contains(s.Code), ct))
+            return false;
+
+        // Todos los permisos canónicos deben existir
+        var expectedCodes = CanonicalModules
+            .SelectMany(m => m.Submodules)
+            .SelectMany(s => s.Permissions)
+            .Select(p => p.Code)
+            .ToList();
+
+        var existingCount = await context.Permissions
+            .CountAsync(p => expectedCodes.Contains(p.Code), ct);
+
+        return existingCount == expectedCodes.Count;
     }
 
     private static async Task<Dictionary<string, Module>> EnsureCanonicalStructureAsync(

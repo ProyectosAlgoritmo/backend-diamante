@@ -105,15 +105,24 @@ public static class SecurityRolesSeed
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        var allPermissionIds = await context.Permissions
-            .Select(permission => permission.Id)
-            .ToListAsync(cancellationToken);
+        var totalPermissions    = await context.Permissions.CountAsync(cancellationToken);
+        var assignedPermissions = await context.RolePermissions.CountAsync(rp => rp.RoleId == administratorRole.Id, cancellationToken);
 
-        if (allPermissionIds.Count == 0)
+        if (totalPermissions == 0)
         {
             logger.LogWarning("No hay permisos registrados en la base de datos para asignar al rol Administrador.");
             return;
         }
+
+        if (totalPermissions == assignedPermissions)
+        {
+            logger.LogDebug("El rol Administrador ya tiene asignados todos los permisos actuales.");
+            return;
+        }
+
+        var allPermissionIds = await context.Permissions
+            .Select(permission => permission.Id)
+            .ToListAsync(cancellationToken);
 
         var assignedPermissionIds = await context.RolePermissions
             .Where(rolePermission => rolePermission.RoleId == administratorRole.Id)
@@ -126,7 +135,7 @@ public static class SecurityRolesSeed
 
         if (missingPermissionIds.Count == 0)
         {
-            logger.LogInformation("El rol Administrador ya tiene asignados todos los permisos actuales.");
+            logger.LogDebug("El rol Administrador ya tiene asignados todos los permisos actuales.");
             return;
         }
 
