@@ -59,20 +59,21 @@ public class UsersLogic : IUsersLogic
     // ── CREATE ────────────────────────────────────────────────────────────────
     public async Task<UserResponse> CreateAsync(CreateUserRequest request)
     {
-        // La cédula es el identificador único entre todos los usuarios
+        // La cédula es el identificador único — buscar incluyendo borrados lógicos
         if (!string.IsNullOrWhiteSpace(request.DocumentId))
         {
             var existingByDoc = await _context.Users
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(u => u.DocumentId != null
                     && u.DocumentId == request.DocumentId.Trim());
 
             if (existingByDoc is not null)
             {
-                if (existingByDoc.Status == "Activo" || existingByDoc.IsActive)
-                    throw new InvalidOperationException("Ya existe un usuario activo con ese documento de identidad.");
+                if (existingByDoc.DeletedAt is not null)
+                    // Borrado lógicamente → reactivar con nuevos datos y contraseña reseteada
+                    return await ReactivateUserAsync(existingByDoc, request);
 
-                // Inactivo → reactivar con los nuevos datos y resetear contraseña
-                return await ReactivateUserAsync(existingByDoc, request);
+                throw new InvalidOperationException("Ya existe un usuario con ese documento de identidad.");
             }
         }
 
@@ -168,6 +169,7 @@ public class UsersLogic : IUsersLogic
         user.Role               = request.Role.Trim();
         user.Status             = "Activo";
         user.IsActive           = true;
+        user.DeletedAt          = null;
         user.PasswordHash       = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
         user.MustChangePassword = true;
         user.UpdatedAt          = DateTime.UtcNow;
@@ -295,7 +297,8 @@ public class UsersLogic : IUsersLogic
         var user = await _context.Users.FindAsync(id);
         if (user is null) return false;
 
-        _context.Users.Remove(user);
+        user.DeletedAt = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
         return true;

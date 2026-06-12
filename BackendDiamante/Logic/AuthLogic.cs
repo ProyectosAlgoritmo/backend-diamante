@@ -110,7 +110,7 @@ public class AuthLogic : IAuthLogic
             .Include(rt => rt.User)
             .FirstOrDefaultAsync(rt => rt.Token == token);
 
-        if (refreshToken is null || !refreshToken.IsActive)
+        if (refreshToken is null || !refreshToken.IsActive || refreshToken.User is null)
             throw new UnauthorizedAccessException("Token de refresco inválido o expirado");
 
         // Rotate: revoke old, create new
