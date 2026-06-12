@@ -30,7 +30,7 @@ public class UsersLogic : IUsersLogic
     private static bool IsProtectedUser(User user) =>
         ProtectedRoles.Contains(user.Role);
 
-    // ── GET ALL (excluye usuarios admin y al usuario actual) ───────────────
+    // ── GET ALL (excluye al usuario actual) ──────────────────────────────────
     public async Task<List<UserResponse>> GetAllAsync(int currentUserId)
     {
         var users = await _context.Users
@@ -40,32 +40,31 @@ public class UsersLogic : IUsersLogic
             .ToListAsync();
 
         return users
-            .Where(u => !IsProtectedUser(u) && u.Id != currentUserId)
+            .Where(u => u.Id != currentUserId)
             .Select(MapToResponse)
             .ToList();
     }
 
-    // ── GET BY ID (bloquea admin) ────────────────────────────────────────────
+    // ── GET BY ID ────────────────────────────────────────────────────────────
     public async Task<UserResponse?> GetByIdAsync(int id)
     {
         var user = await _context.Users
             .Include(u => u.UserCertificates).ThenInclude(uc => uc.Certificate)
             .FirstOrDefaultAsync(u => u.Id == id);
 
-        if (user is null || IsProtectedUser(user)) return null;
+        if (user is null) return null;
         return MapToResponse(user);
     }
 
     // ── CREATE ────────────────────────────────────────────────────────────────
     public async Task<UserResponse> CreateAsync(CreateUserRequest request)
     {
-        // La cédula es el identificador único entre usuarios regulares (se excluyen roles protegidos)
+        // La cédula es el identificador único entre todos los usuarios
         if (!string.IsNullOrWhiteSpace(request.DocumentId))
         {
             var existingByDoc = await _context.Users
                 .FirstOrDefaultAsync(u => u.DocumentId != null
-                    && u.DocumentId == request.DocumentId.Trim()
-                    && !ProtectedRoles.Contains(u.Role));
+                    && u.DocumentId == request.DocumentId.Trim());
 
             if (existingByDoc is not null)
             {
@@ -305,14 +304,11 @@ public class UsersLogic : IUsersLogic
         return true;
     }
 
-    // ── STATS (excluye admin del conteo) ─────────────────────────────────────
+    // ── STATS ─────────────────────────────────────────────────────────────────
     public async Task<UserStatsResponse> GetStatsAsync()
     {
-        var nonAdminQuery = _context.Users
-            .Where(u => !ProtectedRoles.Contains(u.Role));
-
-        var total  = await nonAdminQuery.CountAsync();
-        var active = await nonAdminQuery.CountAsync(u => u.Status == "Activo");
+        var total  = await _context.Users.CountAsync();
+        var active = await _context.Users.CountAsync(u => u.Status == "Activo");
 
         return new UserStatsResponse
         {
