@@ -95,6 +95,9 @@ public class AuthLogic : IAuthLogic
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
 
+        if (string.Equals(user.Role, "Operario", StringComparison.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("Los operarios solo tienen acceso a la aplicación móvil.");
+
         await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
 
         user.ActiveSessionId = Guid.NewGuid().ToString("N");
@@ -195,6 +198,9 @@ public class AuthLogic : IAuthLogic
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
 
+        if (string.Equals(user.Role, "Operario", StringComparison.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("Los operarios solo tienen acceso a la aplicación móvil.");
+
         await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
 
         user.ActiveSessionId = Guid.NewGuid().ToString("N");
@@ -262,6 +268,9 @@ public class AuthLogic : IAuthLogic
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
+
+        if (string.Equals(user.Role, "Operario", StringComparison.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("Los operarios solo tienen acceso a la aplicación móvil.");
 
         await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
 

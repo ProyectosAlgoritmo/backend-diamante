@@ -10,6 +10,12 @@ public class RolesLogic : IRolesLogic
 {
     private readonly ApplicationDbContext _context;
 
+    /// <summary>Roles que no pueden editarse, eliminarse ni copiarse.</summary>
+    private static readonly HashSet<string> ProtectedRoles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Operario",
+    };
+
     public RolesLogic(ApplicationDbContext context)
     {
         _context = context;
@@ -62,6 +68,9 @@ public class RolesLogic : IRolesLogic
 
         if (role is null) return null;
 
+        if (ProtectedRoles.Contains(role.Name))
+            throw new InvalidOperationException($"El rol '{role.Name}' no puede modificarse.");
+
         if (request.Name        is not null) role.Name        = request.Name;
         if (request.Description is not null) role.Description = request.Description;
         if (request.IsActive.HasValue)       role.IsActive     = request.IsActive.Value;
@@ -85,6 +94,9 @@ public class RolesLogic : IRolesLogic
             .FirstOrDefaultAsync(r => r.Id == id && r.DeletedAt == null);
 
         if (role is null) return false;
+
+        if (ProtectedRoles.Contains(role.Name))
+            throw new InvalidOperationException($"El rol '{role.Name}' no puede eliminarse.");
 
         // Remove all permissions assigned to this role
         var rolePermissions = await _context.RolePermissions
