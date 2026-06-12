@@ -20,8 +20,9 @@ public class CreateUserRequest
     [StringLength(30)]
     public string? Phone { get; set; }
 
+    [Required(ErrorMessage = "El documento de identidad es requerido")]
     [StringLength(30)]
-    public string? DocumentId { get; set; }
+    public string DocumentId { get; set; } = null!;
 
     [StringLength(50)]
     public string? Username { get; set; }
