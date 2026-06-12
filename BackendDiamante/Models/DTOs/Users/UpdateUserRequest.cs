@@ -25,5 +25,5 @@ public class UpdateUserRequest
 
     public string? Status { get; set; }
 
-    public List<string>? Certificates { get; set; }
+    public List<int>? Certificates { get; set; }
 }

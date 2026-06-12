@@ -1,6 +1,6 @@
-using System.Text.Json;
 using BackendDiamante.Data;
 using BackendDiamante.Logic.Interfaces;
+using BackendDiamante.Models.DTOs.Certificates;
 using BackendDiamante.Models.DTOs.Users;
 using BackendDiamante.Models.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +12,6 @@ public class UsersLogic : IUsersLogic
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
     private readonly ILogger<UsersLogic> _logger;
-    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>Roles protegidos que no se pueden asignar, editar ni eliminar desde el módulo Usuarios.</summary>
     private static readonly HashSet<string> ProtectedRoles = new(StringComparer.OrdinalIgnoreCase)
@@ -28,19 +27,16 @@ public class UsersLogic : IUsersLogic
         _logger = logger;
     }
 
-    /// <summary>Determina si un usuario tiene un rol protegido.</summary>
     private static bool IsProtectedUser(User user) =>
         ProtectedRoles.Contains(user.Role);
-
-    /// <summary>Determina si un rol es protegido.</summary>
-    private static bool IsProtectedRole(string? role) =>
-        !string.IsNullOrWhiteSpace(role) && ProtectedRoles.Contains(role.Trim());
 
     // ── GET ALL (excluye usuarios admin y al usuario actual) ───────────────
     public async Task<List<UserResponse>> GetAllAsync(int currentUserId)
     {
         var users = await _context.Users
+            .Include(u => u.UserCertificates).ThenInclude(uc => uc.Certificate)
             .OrderByDescending(u => u.CreatedAt)
+            .AsSplitQuery()
             .ToListAsync();
 
         return users
@@ -52,7 +48,10 @@ public class UsersLogic : IUsersLogic
     // ── GET BY ID (bloquea admin) ────────────────────────────────────────────
     public async Task<UserResponse?> GetByIdAsync(int id)
     {
-        var user = await _context.Users.FindAsync(id);
+        var user = await _context.Users
+            .Include(u => u.UserCertificates).ThenInclude(uc => uc.Certificate)
+            .FirstOrDefaultAsync(u => u.Id == id);
+
         if (user is null || IsProtectedUser(user)) return null;
         return MapToResponse(user);
     }
@@ -60,14 +59,12 @@ public class UsersLogic : IUsersLogic
     // ── CREATE ────────────────────────────────────────────────────────────────
     public async Task<UserResponse> CreateAsync(CreateUserRequest request)
     {
-        // Validar email único
         var emailExists = await _context.Users
             .AnyAsync(u => u.Email.ToLower() == request.Email.Trim().ToLower());
 
         if (emailExists)
             throw new InvalidOperationException("Ya existe un usuario con ese correo electrónico.");
 
-        // Validar username único (si viene)
         if (!string.IsNullOrWhiteSpace(request.Username))
         {
             var usernameExists = await _context.Users
@@ -77,7 +74,6 @@ public class UsersLogic : IUsersLogic
                 throw new InvalidOperationException("Ya existe un usuario con ese nombre de usuario.");
         }
 
-        // Validar documentId único (si viene)
         if (!string.IsNullOrWhiteSpace(request.DocumentId))
         {
             var docExists = await _context.Users
@@ -89,31 +85,45 @@ public class UsersLogic : IUsersLogic
 
         var status = request.Status ?? "Activo";
 
-        // La cédula se usa como contraseña inicial
         var password = !string.IsNullOrWhiteSpace(request.DocumentId)
             ? request.DocumentId.Trim()
-            : "Diamante2026!"; // Contraseña por defecto si no hay cédula
+            : "Diamante2026!";
 
         var user = new User
         {
-            FirstName    = request.FirstName.Trim(),
-            LastName     = request.LastName.Trim(),
-            Name         = $"{request.FirstName.Trim()} {request.LastName.Trim()}", // compatibilidad auth
-            Username     = request.Username?.Trim(),
-            Email        = request.Email.Trim().ToLower(),
-            Phone        = request.Phone?.Trim(),
-            DocumentId   = request.DocumentId?.Trim(),
-            Role         = request.Role.Trim(),
-            Status       = status,
-            IsActive     = status == "Activo",
+            FirstName          = request.FirstName.Trim(),
+            LastName           = request.LastName.Trim(),
+            Name               = $"{request.FirstName.Trim()} {request.LastName.Trim()}",
+            Username           = request.Username?.Trim(),
+            Email              = request.Email.Trim().ToLower(),
+            Phone              = request.Phone?.Trim(),
+            DocumentId         = request.DocumentId?.Trim(),
+            Role               = request.Role.Trim(),
+            Status             = status,
+            IsActive           = status == "Activo",
             PasswordHash       = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
             MustChangePassword = true,
-            Certificates       = SerializeCertificates(request.Certificates),
             CreatedAt          = DateTime.UtcNow,
         };
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
+
+        // Asignar certificados
+        if (request.Certificates.Count > 0)
+        {
+            var assignedAt = DateTime.UtcNow;
+            foreach (var certId in request.Certificates.Distinct())
+            {
+                _context.UserCertificates.Add(new UserCertificate
+                {
+                    UserId        = user.Id,
+                    CertificateId = certId,
+                    AssignedAt    = assignedAt,
+                });
+            }
+            await _context.SaveChangesAsync();
+        }
 
         try
         {
@@ -130,7 +140,12 @@ public class UsersLogic : IUsersLogic
             _logger.LogError(ex, "No se pudo enviar correo de bienvenida a {Email}. El usuario fue creado correctamente.", user.Email);
         }
 
-        return MapToResponse(user);
+        // Recargar con certificados para la respuesta
+        var created = await _context.Users
+            .Include(u => u.UserCertificates).ThenInclude(uc => uc.Certificate)
+            .FirstAsync(u => u.Id == user.Id);
+
+        return MapToResponse(created);
     }
 
     // ── UPDATE ────────────────────────────────────────────────────────────────
@@ -139,7 +154,6 @@ public class UsersLogic : IUsersLogic
         var user = await _context.Users.FindAsync(id);
         if (user is null) return null;
 
-        // Validar email único (si cambia)
         if (request.Email is not null)
         {
             var emailExists = await _context.Users
@@ -149,7 +163,6 @@ public class UsersLogic : IUsersLogic
                 throw new InvalidOperationException("Ya existe un usuario con ese correo electrónico.");
         }
 
-        // Validar username único (si cambia)
         if (request.Username is not null && !string.IsNullOrWhiteSpace(request.Username))
         {
             var usernameExists = await _context.Users
@@ -159,7 +172,6 @@ public class UsersLogic : IUsersLogic
                 throw new InvalidOperationException("Ya existe un usuario con ese nombre de usuario.");
         }
 
-        // Aplicar cambios
         if (request.FirstName is not null) user.FirstName = request.FirstName.Trim();
         if (request.LastName  is not null) user.LastName  = request.LastName.Trim();
         if (request.Email     is not null) user.Email     = request.Email.Trim().ToLower();
@@ -167,25 +179,43 @@ public class UsersLogic : IUsersLogic
         if (request.Username  is not null) user.Username  = request.Username.Trim();
         if (request.Role      is not null) user.Role      = request.Role.Trim();
 
-        if (request.Certificates is not null)
-            user.Certificates = SerializeCertificates(request.Certificates);
-
-        // Sincronizar Name (compatibilidad auth)
         user.Name = $"{user.FirstName ?? ""} {user.LastName ?? ""}".Trim();
         if (string.IsNullOrEmpty(user.Name)) user.Name = user.Email;
 
-        // Sincronizar Status <-> IsActive
         if (request.Status is not null)
         {
             user.Status   = request.Status;
             user.IsActive = request.Status == "Activo";
         }
 
-        user.UpdatedAt = DateTime.UtcNow;
+        // Reemplazar certificados si vienen en la solicitud
+        if (request.Certificates is not null)
+        {
+            var existing = await _context.UserCertificates
+                .Where(uc => uc.UserId == id)
+                .ToListAsync();
+            _context.UserCertificates.RemoveRange(existing);
 
+            foreach (var certId in request.Certificates.Distinct())
+            {
+                _context.UserCertificates.Add(new UserCertificate
+                {
+                    UserId        = id,
+                    CertificateId = certId,
+                    AssignedAt    = DateTime.UtcNow,
+                });
+            }
+        }
+
+        user.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        return MapToResponse(user);
+        // Recargar con certificados para la respuesta
+        var updated = await _context.Users
+            .Include(u => u.UserCertificates).ThenInclude(uc => uc.Certificate)
+            .FirstAsync(u => u.Id == id);
+
+        return MapToResponse(updated);
     }
 
     // ── DELETE (bloquea eliminación de admin y auto-eliminación) ────────────
@@ -197,7 +227,6 @@ public class UsersLogic : IUsersLogic
         var user = await _context.Users.FindAsync(id);
         if (user is null) return false;
 
-        // Bloquear eliminación de usuarios con rol protegido
         if (IsProtectedUser(user))
             throw new InvalidOperationException("No es posible eliminar un usuario administrador.");
 
@@ -235,22 +264,8 @@ public class UsersLogic : IUsersLogic
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private static string? SerializeCertificates(List<string>? certs)
-    {
-        if (certs is null || certs.Count == 0) return null;
-        return JsonSerializer.Serialize(certs);
-    }
-
-    private static List<string> DeserializeCertificates(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return [];
-        try { return JsonSerializer.Deserialize<List<string>>(json, JsonOpts) ?? []; }
-        catch { return []; }
-    }
-
     private static UserResponse MapToResponse(User user)
     {
-        // Backward compat: si FirstName es null, inferir de Name
         var firstName = user.FirstName;
         var lastName  = user.LastName;
 
@@ -272,7 +287,10 @@ public class UsersLogic : IUsersLogic
             DocumentId   = user.DocumentId,
             Role         = user.Role,
             Status       = user.Status,
-            Certificates = DeserializeCertificates(user.Certificates),
+            Certificates = user.UserCertificates
+                .Where(uc => uc.Certificate is not null)
+                .Select(uc => new CertificateResponse(uc.CertificateId, uc.Certificate!.Name))
+                .ToList(),
             CreatedAt    = user.CreatedAt,
             UpdatedAt    = user.UpdatedAt,
         };

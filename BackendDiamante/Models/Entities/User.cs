@@ -21,10 +21,11 @@ public class User
     public string? DocumentId { get; set; }
     public string Status { get; set; } = "Activo";
     public bool MustChangePassword { get; set; }
-    /// <summary>Certificados almacenados como JSON array (ej: ["Cert1","Cert2"])</summary>
+    /// <summary>Columna JSON legada — se mantiene nullable para migración. Usar UserCertificates.</summary>
     public string? Certificates { get; set; }
 
     // ─── Relaciones ──────────────────────────────────────────────────────────
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
+    public ICollection<UserCertificate> UserCertificates { get; set; } = new List<UserCertificate>();
 }

@@ -127,6 +127,7 @@ builder.Services.AddScoped<IUsersLogic, UsersLogic>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ICostCentersLogic, CostCentersLogic>();
 builder.Services.AddScoped<INotificationsLogic, NotificationsLogic>();
+builder.Services.AddScoped<ICertificatesLogic, CertificatesLogic>();
 
 var app = builder.Build();
 
@@ -165,6 +166,7 @@ static async Task SeedStartupDataAsync(WebApplication app)
         await SecurityModulesSeed.SeedAsync(context, logger);
         await SecurityRolesSeed.SeedAsync(context, logger);
         await SeedDefaultUsersAsync(context, logger);
+        await CertificatesSeed.SeedAsync(context, logger);
     }
     catch (Exception ex)
     {

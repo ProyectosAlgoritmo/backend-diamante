@@ -24,6 +24,10 @@ public partial class ApplicationDbContext : DbContext
     public DbSet<RefreshToken>       RefreshTokens      { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
+    // ─── Certificates ──────────────────────────────────────────────────────────
+    public DbSet<Certificate>     Certificates     { get; set; }
+    public DbSet<UserCertificate> UserCertificates { get; set; }
+
     // ─── Notifications ─────────────────────────────────────────────────────────
     public DbSet<Notification>     Notifications     { get; set; }
     public DbSet<NotificationUser> NotificationUsers { get; set; }
@@ -280,6 +284,36 @@ public partial class ApplicationDbContext : DbContext
                 .HasForeignKey(d => d.OperatorId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_CostCenterOperators_Operators");
+        });
+
+        // ─── Certificates ─────────────────────────────────────────────────────
+        modelBuilder.Entity<Certificate>(entity =>
+        {
+            entity.ToTable("Certificates", "security");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.HasIndex(e => e.Name, "UQ_Certificates_Name").IsUnique();
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        modelBuilder.Entity<UserCertificate>(entity =>
+        {
+            entity.ToTable("UserCertificates", "security");
+            entity.HasKey(e => new { e.UserId, e.CertificateId });
+            entity.Property(e => e.AssignedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.UserCertificates)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_UserCertificates_Users");
+
+            entity.HasOne(e => e.Certificate)
+                .WithMany(c => c.UserCertificates)
+                .HasForeignKey(e => e.CertificateId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_UserCertificates_Certs");
         });
 
         OnModelCreatingPartial(modelBuilder);
