@@ -59,11 +59,21 @@ public class UsersLogic : IUsersLogic
     // ── CREATE ────────────────────────────────────────────────────────────────
     public async Task<UserResponse> CreateAsync(CreateUserRequest request)
     {
-        var emailExists = await _context.Users
-            .AnyAsync(u => u.Email.ToLower() == request.Email.Trim().ToLower());
+        // La cédula es el identificador único: no puede repetirse entre usuarios
+        if (!string.IsNullOrWhiteSpace(request.DocumentId))
+        {
+            var existingByDoc = await _context.Users
+                .FirstOrDefaultAsync(u => u.DocumentId != null && u.DocumentId == request.DocumentId.Trim());
 
-        if (emailExists)
-            throw new InvalidOperationException("Ya existe un usuario con ese correo electrónico.");
+            if (existingByDoc is not null)
+            {
+                if (existingByDoc.Status == "Activo" || existingByDoc.IsActive)
+                    throw new InvalidOperationException("Ya existe un usuario activo con ese documento de identidad.");
+
+                // Inactivo → reactivar con los nuevos datos y resetear contraseña
+                return await ReactivateUserAsync(existingByDoc, request);
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Username))
         {
@@ -72,15 +82,6 @@ public class UsersLogic : IUsersLogic
 
             if (usernameExists)
                 throw new InvalidOperationException("Ya existe un usuario con ese nombre de usuario.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.DocumentId))
-        {
-            var docExists = await _context.Users
-                .AnyAsync(u => u.DocumentId != null && u.DocumentId == request.DocumentId.Trim());
-
-            if (docExists)
-                throw new InvalidOperationException("Ya existe un usuario con ese documento de identidad.");
         }
 
         var status = request.Status ?? "Activo";
@@ -127,20 +128,8 @@ public class UsersLogic : IUsersLogic
             await _context.SaveChangesAsync();
         }
 
-        try
-        {
-            var displayUsername = user.Username ?? user.Email.Split('@')[0];
-            await _emailService.SendWelcomeEmailAsync(
-                user.Email,
-                $"{user.FirstName} {user.LastName}".Trim(),
-                displayUsername,
-                password
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "No se pudo enviar correo de bienvenida a {Email}. El usuario fue creado correctamente.", user.Email);
-        }
+        await SendWelcomeEmailSafe(user.Email, $"{user.FirstName} {user.LastName}".Trim(),
+            user.Username ?? user.Email.Split('@')[0], password);
 
         // Recargar con certificados para la respuesta
         var created = await _context.Users
@@ -148,6 +137,82 @@ public class UsersLogic : IUsersLogic
             .FirstAsync(u => u.Id == user.Id);
 
         return MapToResponse(created);
+    }
+
+    // ── REACTIVAR usuario inactivo con datos nuevos y contraseña reseteada ────
+    private async Task<UserResponse> ReactivateUserAsync(User user, CreateUserRequest request)
+    {
+        if (!string.IsNullOrWhiteSpace(request.Username))
+        {
+            var usernameConflict = await _context.Users
+                .AnyAsync(u => u.Id != user.Id && u.Username != null
+                    && u.Username.ToLower() == request.Username.Trim().ToLower());
+
+            if (usernameConflict)
+                throw new InvalidOperationException("Ya existe un usuario con ese nombre de usuario.");
+        }
+
+        var docDigits = string.IsNullOrWhiteSpace(request.DocumentId)
+            ? ""
+            : new string(request.DocumentId.Trim().Where(char.IsDigit).Take(4).ToArray());
+        var password = docDigits.Length >= 4 ? docDigits : "Diam2026!";
+
+        user.FirstName          = request.FirstName.Trim();
+        user.LastName           = request.LastName.Trim();
+        user.Name               = $"{request.FirstName.Trim()} {request.LastName.Trim()}";
+        user.Username           = request.Username?.Trim();
+        user.Email              = request.Email.Trim().ToLower();
+        user.Phone              = request.Phone?.Trim();
+        user.DocumentId         = request.DocumentId?.Trim();
+        user.Role               = request.Role.Trim();
+        user.Status             = "Activo";
+        user.IsActive           = true;
+        user.PasswordHash       = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
+        user.MustChangePassword = true;
+        user.UpdatedAt          = DateTime.UtcNow;
+
+        // Reemplazar certificados
+        var existingCerts = await _context.UserCertificates
+            .Where(uc => uc.UserId == user.Id)
+            .ToListAsync();
+        _context.UserCertificates.RemoveRange(existingCerts);
+
+        if (request.Certificates.Count > 0)
+        {
+            var assignedAt = DateTime.UtcNow;
+            foreach (var certId in request.Certificates.Distinct())
+            {
+                _context.UserCertificates.Add(new UserCertificate
+                {
+                    UserId        = user.Id,
+                    CertificateId = certId,
+                    AssignedAt    = assignedAt,
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        await SendWelcomeEmailSafe(user.Email, $"{user.FirstName} {user.LastName}".Trim(),
+            user.Username ?? user.Email.Split('@')[0], password);
+
+        var reactivated = await _context.Users
+            .Include(u => u.UserCertificates).ThenInclude(uc => uc.Certificate)
+            .FirstAsync(u => u.Id == user.Id);
+
+        return MapToResponse(reactivated);
+    }
+
+    private async Task SendWelcomeEmailSafe(string email, string fullName, string username, string password)
+    {
+        try
+        {
+            await _emailService.SendWelcomeEmailAsync(email, fullName, username, password);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "No se pudo enviar correo de bienvenida a {Email}. El usuario fue creado correctamente.", email);
+        }
     }
 
     // ── UPDATE ────────────────────────────────────────────────────────────────

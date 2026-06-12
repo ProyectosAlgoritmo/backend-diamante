@@ -68,8 +68,16 @@ public class AuthLogic : IAuthLogic
         if (isEmail)
         {
             var emailLower = identifier.ToLower();
-            user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == emailLower);
+            var matches = await _context.Users
+                .Where(u => u.Email.ToLower() == emailLower)
+                .ToListAsync();
+
+            // El correo puede estar asociado a más de un usuario; en ese caso se exige username
+            if (matches.Count > 1)
+                throw new InvalidOperationException(
+                    "Ese correo está asociado a más de una cuenta. Por favor inicia sesión con tu nombre de usuario.");
+
+            user = matches.FirstOrDefault();
         }
         else
         {
