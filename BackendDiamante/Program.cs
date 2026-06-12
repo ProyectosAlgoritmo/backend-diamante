@@ -149,6 +149,7 @@ app.UseCors("AllowAll");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<SessionValidationMiddleware>();
 app.UseMiddleware<PermissionAuthorizationMiddleware>();
 app.MapControllers();
 

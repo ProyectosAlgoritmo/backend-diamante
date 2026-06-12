@@ -10,6 +10,7 @@ using BackendDiamante.Models.DTOs.Auth;
 using BackendDiamante.Models.Entities;
 using BackendDiamante.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 
 namespace BackendDiamante.Logic;
@@ -21,19 +22,22 @@ public class AuthLogic : IAuthLogic
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IEmailService _emailService;
     private readonly ILogger<AuthLogic> _logger;
+    private readonly IMemoryCache _cache;
 
     public AuthLogic(
         ApplicationDbContext context,
         IConfiguration config,
         IHttpClientFactory httpClientFactory,
         IEmailService emailService,
-        ILogger<AuthLogic> logger)
+        ILogger<AuthLogic> logger,
+        IMemoryCache cache)
     {
         _context = context;
         _config = config;
         _httpClientFactory = httpClientFactory;
         _emailService = emailService;
         _logger = logger;
+        _cache = cache;
     }
 
     // ─── Validación de dominio empresarial ──────────────────────────────────
@@ -93,13 +97,16 @@ public class AuthLogic : IAuthLogic
 
         await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
 
-        user.LastLoginAt = DateTime.UtcNow;
+        user.ActiveSessionId = Guid.NewGuid().ToString("N");
+        user.LastLoginAt     = DateTime.UtcNow;
 
         var accessToken = GenerateAccessToken(user);
         var refreshToken = GenerateRefreshToken(user.Id, ipAddress);
 
         _context.RefreshTokens.Add(refreshToken);
         await _context.SaveChangesAsync();
+
+        _cache.Remove($"sess_{user.Id}");
 
         return await BuildLoginResponseAsync(accessToken, refreshToken, user);
     }
@@ -190,12 +197,15 @@ public class AuthLogic : IAuthLogic
 
         await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
 
-        user.LastLoginAt = DateTime.UtcNow;
+        user.ActiveSessionId = Guid.NewGuid().ToString("N");
+        user.LastLoginAt     = DateTime.UtcNow;
 
         var accessToken = GenerateAccessToken(user);
         var refreshToken = GenerateRefreshToken(user.Id, ipAddress);
         _context.RefreshTokens.Add(refreshToken);
         await _context.SaveChangesAsync();
+
+        _cache.Remove($"sess_{user.Id}");
 
         return await BuildLoginResponseAsync(accessToken, refreshToken, user);
     }
@@ -255,12 +265,15 @@ public class AuthLogic : IAuthLogic
 
         await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
 
-        user.LastLoginAt = DateTime.UtcNow;
+        user.ActiveSessionId = Guid.NewGuid().ToString("N");
+        user.LastLoginAt     = DateTime.UtcNow;
 
         var accessToken = GenerateAccessToken(user);
         var refreshToken = GenerateRefreshToken(user.Id, ipAddress);
         _context.RefreshTokens.Add(refreshToken);
         await _context.SaveChangesAsync();
+
+        _cache.Remove($"sess_{user.Id}");
 
         return await BuildLoginResponseAsync(accessToken, refreshToken, user);
     }
@@ -445,6 +458,7 @@ public class AuthLogic : IAuthLogic
             new Claim(JwtRegisteredClaimNames.Name, user.Name),
             new Claim(ClaimTypes.Role, user.Role),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim("sid", user.ActiveSessionId ?? ""),
         };
 
         var token = new JwtSecurityToken(

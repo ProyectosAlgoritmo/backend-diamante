@@ -13,6 +13,7 @@ public class User
     public DateTime? UpdatedAt { get; set; }
     public DateTime? DeletedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    public string? ActiveSessionId { get; set; }
 
     // ─── Campos extendidos (modulo Usuarios) ─────────────────────────────────
     public string? FirstName { get; set; }

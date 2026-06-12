@@ -132,6 +132,7 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             entity.Property(e => e.DeletedAt).HasColumnType("DATETIME2");
+            entity.Property(e => e.ActiveSessionId).HasMaxLength(32);
 
             // Soft-delete: excluir borrados lógicos de todas las consultas por defecto
             entity.HasQueryFilter(e => e.DeletedAt == null);
