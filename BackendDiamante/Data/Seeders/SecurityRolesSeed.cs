@@ -9,7 +9,7 @@ public static class SecurityRolesSeed
     private sealed record SeedRoleDefinition(string Name, string Description);
 
     private static readonly SeedRoleDefinition AdministratorRoleDefinition =
-        new(RoleNameResolver.AdministratorRoleName, "Rol del sistema con acceso total a todos los modulos, submodulos y permisos.");
+        new(RoleNameResolver.AdministratorRoleName, "Rol del sistema con acceso total a todos los módulos, submódulos y permisos.");
 
     private static readonly SeedRoleDefinition[] DefaultRoles =
     [

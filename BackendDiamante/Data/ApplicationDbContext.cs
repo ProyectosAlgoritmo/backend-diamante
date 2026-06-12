@@ -24,6 +24,10 @@ public partial class ApplicationDbContext : DbContext
     public DbSet<RefreshToken>       RefreshTokens      { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
+    // ─── Certificates ──────────────────────────────────────────────────────────
+    public DbSet<Certificate>     Certificates     { get; set; }
+    public DbSet<UserCertificate> UserCertificates { get; set; }
+
     // ─── Notifications ─────────────────────────────────────────────────────────
     public DbSet<Notification>     Notifications     { get; set; }
     public DbSet<NotificationUser> NotificationUsers { get; set; }
@@ -121,21 +125,30 @@ public partial class ApplicationDbContext : DbContext
 
             // Campos originales (auth)
             entity.Property(e => e.Email).IsRequired().HasMaxLength(200);
-            entity.HasIndex(e => e.Email).IsUnique();
+            entity.HasIndex(e => e.Email);  // el correo puede repetirse entre usuarios
             entity.Property(e => e.Name).IsRequired().HasMaxLength(150);
             entity.Property(e => e.PasswordHash).IsRequired();
             entity.Property(e => e.Role).IsRequired().HasMaxLength(50);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.DeletedAt).HasColumnType("DATETIME2");
+            entity.Property(e => e.ActiveSessionId).HasMaxLength(32);
+
+            // Soft-delete: excluir borrados lógicos de todas las consultas por defecto
+            entity.HasQueryFilter(e => e.DeletedAt == null);
 
             // Campos extendidos (modulo Usuarios)
             entity.Property(e => e.FirstName).HasMaxLength(100);
             entity.Property(e => e.LastName).HasMaxLength(100);
             entity.Property(e => e.Username).HasMaxLength(50);
-            entity.HasIndex(e => e.Username).IsUnique().HasFilter("[Username] IS NOT NULL");
+            entity.HasIndex(e => e.Username).IsUnique()
+                .HasFilter("[Username] IS NOT NULL AND [DeletedAt] IS NULL")
+                .HasDatabaseName("IX_Users_Username_Active");
             entity.Property(e => e.Phone).HasMaxLength(30);
             entity.Property(e => e.DocumentId).HasMaxLength(30);
-            entity.HasIndex(e => e.DocumentId).IsUnique().HasFilter("[DocumentId] IS NOT NULL");
+            entity.HasIndex(e => e.DocumentId).IsUnique()
+                .HasFilter("[DocumentId] IS NOT NULL AND [DeletedAt] IS NULL")
+                .HasDatabaseName("IX_Users_DocumentId_Active");
             entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("Activo");
             entity.Property(e => e.MustChangePassword).HasDefaultValue(false);
             entity.Property(e => e.Certificates).HasColumnType("NVARCHAR(MAX)");
@@ -280,6 +293,36 @@ public partial class ApplicationDbContext : DbContext
                 .HasForeignKey(d => d.OperatorId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_CostCenterOperators_Operators");
+        });
+
+        // ─── Certificates ─────────────────────────────────────────────────────
+        modelBuilder.Entity<Certificate>(entity =>
+        {
+            entity.ToTable("Certificates", "security");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.HasIndex(e => e.Name, "UQ_Certificates_Name").IsUnique();
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        modelBuilder.Entity<UserCertificate>(entity =>
+        {
+            entity.ToTable("UserCertificates", "security");
+            entity.HasKey(e => new { e.UserId, e.CertificateId });
+            entity.Property(e => e.AssignedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.UserCertificates)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_UserCertificates_Users");
+
+            entity.HasOne(e => e.Certificate)
+                .WithMany(c => c.UserCertificates)
+                .HasForeignKey(e => e.CertificateId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_UserCertificates_Certs");
         });
 
         OnModelCreatingPartial(modelBuilder);

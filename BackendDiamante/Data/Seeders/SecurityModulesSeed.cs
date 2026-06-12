@@ -34,7 +34,7 @@ public static class SecurityModulesSeed
                         new("Eliminar", "SECURITY.USERS.DELETE"),
                     ]),
                 new(
-                    "Configuracion",
+                    "Configuración",
                     "SECURITY.SETTINGS",
                     [
                         new("Ver", "SECURITY.SETTINGS.VIEW"),
@@ -82,7 +82,7 @@ public static class SecurityModulesSeed
                         new("Eliminar", "BUSINESS.FLOORS.DELETE"),
                     ]),
                 new(
-                    "Asignacion de personal",
+                    "Asignación de personal",
                     "BUSINESS.STAFF_ASSIGNMENT",
                     [
                         new("Ver", "BUSINESS.STAFF_ASSIGNMENT.VIEW"),
@@ -154,7 +154,7 @@ public static class SecurityModulesSeed
     {
         if (await IsCatalogUpToDateAsync(context, cancellationToken))
         {
-            logger.LogDebug("Catalogo de seguridad ya actualizado. Seed omitido.");
+            logger.LogDebug("Catálogo de seguridad ya actualizado. Seed omitido.");
             return;
         }
 
@@ -222,7 +222,7 @@ public static class SecurityModulesSeed
                 await context.SaveChangesAsync(cancellationToken);
 
                 modulesByCode[module.Code] = module;
-                logger.LogInformation("Modulo de seguridad creado: {ModuleCode}", module.Code);
+                logger.LogInformation("Módulo de seguridad creado: {ModuleCode}", module.Code);
             }
             else if (!module.IsActive || !string.Equals(module.Name, moduleDefinition.Name, StringComparison.Ordinal))
             {
@@ -230,7 +230,7 @@ public static class SecurityModulesSeed
                 module.Name     = moduleDefinition.Name;
                 await context.SaveChangesAsync(cancellationToken);
 
-                logger.LogInformation("Modulo de seguridad normalizado: {ModuleCode}", module.Code);
+                logger.LogInformation("Módulo de seguridad normalizado: {ModuleCode}", module.Code);
             }
 
             foreach (var submoduleDefinition in moduleDefinition.Submodules)
@@ -251,7 +251,7 @@ public static class SecurityModulesSeed
                     await context.SaveChangesAsync(cancellationToken);
 
                     submodulesByCode[submodule.Code] = submodule;
-                    logger.LogInformation("Submodulo de seguridad creado: {SubmoduleCode}", submodule.Code);
+                    logger.LogInformation("Submódulo de seguridad creado: {SubmoduleCode}", submodule.Code);
                 }
                 else
                 {
@@ -264,7 +264,7 @@ public static class SecurityModulesSeed
                     if (changed)
                     {
                         await context.SaveChangesAsync(cancellationToken);
-                        logger.LogInformation("Submodulo de seguridad normalizado: {SubmoduleCode}", submodule.Code);
+                        logger.LogInformation("Submódulo de seguridad normalizado: {SubmoduleCode}", submodule.Code);
                     }
                 }
 
@@ -373,7 +373,7 @@ public static class SecurityModulesSeed
         if (migratedAssignments > 0)
         {
             await context.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Se migraron {AssignmentCount} permisos desde codigos legacy al catalogo actual.", migratedAssignments);
+            logger.LogInformation("Se migraron {AssignmentCount} permisos desde códigos legacy al catálogo actual.", migratedAssignments);
         }
     }
 
@@ -400,7 +400,7 @@ public static class SecurityModulesSeed
             context.Permissions.RemoveRange(obsoletePermissions);
             await context.SaveChangesAsync(cancellationToken);
 
-            logger.LogInformation("Se eliminaron {PermissionCount} permisos obsoletos del catalogo.", obsoletePermissions.Count);
+            logger.LogInformation("Se eliminaron {PermissionCount} permisos obsoletos del catálogo.", obsoletePermissions.Count);
         }
 
         var obsoleteSubmodules = await context.Submodules
@@ -434,7 +434,7 @@ public static class SecurityModulesSeed
             context.Submodules.RemoveRange(obsoleteSubmodules);
             await context.SaveChangesAsync(cancellationToken);
 
-            logger.LogInformation("Se eliminaron {SubmoduleCount} submodulos obsoletos.", obsoleteSubmodules.Count);
+            logger.LogInformation("Se eliminaron {SubmoduleCount} submódulos obsoletos.", obsoleteSubmodules.Count);
         }
 
         var obsoleteModules = await context.Modules
@@ -446,7 +446,7 @@ public static class SecurityModulesSeed
             context.Modules.RemoveRange(obsoleteModules);
             await context.SaveChangesAsync(cancellationToken);
 
-            logger.LogInformation("Se eliminaron {ModuleCount} modulos obsoletos.", obsoleteModules.Count);
+            logger.LogInformation("Se eliminaron {ModuleCount} módulos obsoletos.", obsoleteModules.Count);
         }
     }
 
@@ -486,7 +486,7 @@ public static class SecurityModulesSeed
         if (changed)
         {
             await context.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Se reactivaron elementos canonicos del catalogo de seguridad.");
+            logger.LogInformation("Se reactivaron elementos canónicos del catálogo de seguridad.");
         }
     }
 }

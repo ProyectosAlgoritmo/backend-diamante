@@ -36,7 +36,7 @@ public class PermissionAuthorizationMiddleware
         if (context.User.Identity?.IsAuthenticated != true)
         {
             await WriteJsonErrorAsync(context, StatusCodes.Status401Unauthorized,
-                "Tu sesion no es valida o expiro.");
+                "Tu sesión no es válida o expiró.");
             return;
         }
 
@@ -46,7 +46,7 @@ public class PermissionAuthorizationMiddleware
         if (!int.TryParse(userIdValue, out var userId))
         {
             await WriteJsonErrorAsync(context, StatusCodes.Status401Unauthorized,
-                "Tu sesion no es valida o expiro.");
+                "Tu sesión no es válida o expiró.");
             return;
         }
 
@@ -56,7 +56,7 @@ public class PermissionAuthorizationMiddleware
         if (string.IsNullOrWhiteSpace(userRoleName))
         {
             await WriteJsonErrorAsync(context, StatusCodes.Status403Forbidden,
-                "No tienes permisos para realizar esta accion.");
+                "No tienes permisos para realizar esta acción.");
             return;
         }
 
@@ -77,7 +77,7 @@ public class PermissionAuthorizationMiddleware
         if (!hasAllPermissions)
         {
             await WriteJsonErrorAsync(context, StatusCodes.Status403Forbidden,
-                "No tienes permisos para realizar esta accion.");
+                "No tienes permisos para realizar esta acción.");
             return;
         }
 

@@ -11,7 +11,9 @@ public class User
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    public string? ActiveSessionId { get; set; }
 
     // ─── Campos extendidos (modulo Usuarios) ─────────────────────────────────
     public string? FirstName { get; set; }
@@ -21,10 +23,11 @@ public class User
     public string? DocumentId { get; set; }
     public string Status { get; set; } = "Activo";
     public bool MustChangePassword { get; set; }
-    /// <summary>Certificados almacenados como JSON array (ej: ["Cert1","Cert2"])</summary>
+    /// <summary>Columna JSON legada — se mantiene nullable para migración. Usar UserCertificates.</summary>
     public string? Certificates { get; set; }
 
     // ─── Relaciones ──────────────────────────────────────────────────────────
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
+    public ICollection<UserCertificate> UserCertificates { get; set; } = new List<UserCertificate>();
 }

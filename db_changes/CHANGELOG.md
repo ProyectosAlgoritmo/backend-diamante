@@ -16,6 +16,22 @@ Formato de cada entrada:
 
 ---
 
+## [2026-06-11] Crear tablas Certificates y UserCertificates
+
+**Script:** [`20260611_002_add-certificates-tables.sql`](scripts/20260611_002_add-certificates-tables.sql)
+**Autor:** Juan Sandoval
+**Rama:** `fix/user-roles`
+
+**Motivación:**
+Los certificados de los usuarios estaban almacenados como un array JSON en la columna `security.Users.Certificates` (NVARCHAR(MAX)), lo que impedía gestionar el catálogo de certificados de forma independiente y hacía imposibles las búsquedas o reportes por certificado. Se requería además poder crear nuevos certificados desde el formulario de usuario.
+
+**Impacto:**
+- Tabla nueva: `security.Certificates` — catálogo de certificados/cursos disponibles.
+- Tabla nueva: `security.UserCertificates` — relación muchos-a-muchos entre usuarios y certificados.
+- La columna `security.Users.Certificates` (JSON) queda obsoleta; el seeder la migra al nuevo esquema y la limpia.
+
+---
+
 ## [2026-06-11] Agregar índice en security.Roles (Name)
 
 **Script:** [`20260611_001_add-index-roles-name.sql`](scripts/20260611_001_add-index-roles-name.sql)

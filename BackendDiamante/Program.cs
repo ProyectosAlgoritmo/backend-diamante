@@ -67,7 +67,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 var body = JsonSerializer.Serialize(new
                 {
                     success = false,
-                    message = "Tu sesion no es valida o expiro."
+                    message = "Tu sesión no es válida o expiró."
                 });
 
                 await context.Response.WriteAsync(body);
@@ -80,7 +80,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 var body = JsonSerializer.Serialize(new
                 {
                     success = false,
-                    message = "No tienes permisos para realizar esta accion."
+                    message = "No tienes permisos para realizar esta acción."
                 });
 
                 await context.Response.WriteAsync(body);
@@ -127,6 +127,7 @@ builder.Services.AddScoped<IUsersLogic, UsersLogic>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ICostCentersLogic, CostCentersLogic>();
 builder.Services.AddScoped<INotificationsLogic, NotificationsLogic>();
+builder.Services.AddScoped<ICertificatesLogic, CertificatesLogic>();
 
 var app = builder.Build();
 
@@ -148,6 +149,7 @@ app.UseCors("AllowAll");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<SessionValidationMiddleware>();
 app.UseMiddleware<PermissionAuthorizationMiddleware>();
 app.MapControllers();
 
@@ -165,6 +167,7 @@ static async Task SeedStartupDataAsync(WebApplication app)
         await SecurityModulesSeed.SeedAsync(context, logger);
         await SecurityRolesSeed.SeedAsync(context, logger);
         await SeedDefaultUsersAsync(context, logger);
+        await CertificatesSeed.SeedAsync(context, logger);
     }
     catch (Exception ex)
     {
