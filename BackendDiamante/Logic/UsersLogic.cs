@@ -57,13 +57,9 @@ public class UsersLogic : IUsersLogic
         return MapToResponse(user);
     }
 
-    // ── CREATE (bloquea asignacion de rol admin) ─────────────────────────────
+    // ── CREATE ────────────────────────────────────────────────────────────────
     public async Task<UserResponse> CreateAsync(CreateUserRequest request)
     {
-        // Validar que no se asigne un rol protegido
-        if (IsProtectedRole(request.Role))
-            throw new InvalidOperationException("No es posible asignar el rol de administrador.");
-
         // Validar email unico
         var emailExists = await _context.Users
             .AnyAsync(u => u.Email.ToLower() == request.Email.Trim().ToLower());
@@ -137,19 +133,11 @@ public class UsersLogic : IUsersLogic
         return MapToResponse(user);
     }
 
-    // ── UPDATE (bloquea edicion de admin y asignacion de rol admin) ───────────
+    // ── UPDATE ────────────────────────────────────────────────────────────────
     public async Task<UserResponse?> UpdateAsync(int id, UpdateUserRequest request)
     {
         var user = await _context.Users.FindAsync(id);
         if (user is null) return null;
-
-        // Bloquear edicion de usuarios con rol protegido
-        if (IsProtectedUser(user))
-            throw new InvalidOperationException("No es posible modificar un usuario administrador.");
-
-        // Bloquear asignacion de rol protegido
-        if (IsProtectedRole(request.Role))
-            throw new InvalidOperationException("No es posible asignar el rol de administrador.");
 
         // Validar email unico (si cambia)
         if (request.Email is not null)
