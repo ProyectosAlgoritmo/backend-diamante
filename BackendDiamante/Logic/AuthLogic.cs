@@ -10,6 +10,7 @@ using BackendDiamante.Models.DTOs.Auth;
 using BackendDiamante.Models.Entities;
 using BackendDiamante.Security;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 
 namespace BackendDiamante.Logic;
@@ -21,26 +22,29 @@ public class AuthLogic : IAuthLogic
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IEmailService _emailService;
     private readonly ILogger<AuthLogic> _logger;
+    private readonly IMemoryCache _cache;
 
     public AuthLogic(
         ApplicationDbContext context,
         IConfiguration config,
         IHttpClientFactory httpClientFactory,
         IEmailService emailService,
-        ILogger<AuthLogic> logger)
+        ILogger<AuthLogic> logger,
+        IMemoryCache cache)
     {
         _context = context;
         _config = config;
         _httpClientFactory = httpClientFactory;
         _emailService = emailService;
         _logger = logger;
+        _cache = cache;
     }
 
-    // ─── Validacion de dominio empresarial ──────────────────────────────────
+    // ─── Validación de dominio empresarial ──────────────────────────────────
     private void ValidateDomain(string email)
     {
         var allowedDomain = _config["Auth:AllowedDomain"];
-        if (string.IsNullOrEmpty(allowedDomain)) return; // Si no esta configurado, no restringir
+        if (string.IsNullOrEmpty(allowedDomain)) return; // Si no está configurado, no restringir
 
         var domain = email.Trim().ToLower().Split('@').LastOrDefault();
         if (!string.Equals(domain, allowedDomain.Trim().ToLower(), StringComparison.Ordinal))
@@ -63,17 +67,21 @@ public class AuthLogic : IAuthLogic
         var identifier = request.Email.Trim();
         var isEmail = identifier.Contains('@');
 
-        // Solo validar dominio si es un correo electronico
-        if (isEmail)
-            ValidateDomain(identifier.ToLower());
-
         // Buscar por email o por username
         User? user;
         if (isEmail)
         {
             var emailLower = identifier.ToLower();
-            user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == emailLower);
+            var matches = await _context.Users
+                .Where(u => u.Email.ToLower() == emailLower)
+                .ToListAsync();
+
+            // El correo puede estar asociado a más de un usuario; en ese caso se exige username
+            if (matches.Count > 1)
+                throw new InvalidOperationException(
+                    "Ese correo está asociado a más de una cuenta. Por favor inicia sesión con tu nombre de usuario.");
+
+            user = matches.FirstOrDefault();
         }
         else
         {
@@ -87,13 +95,18 @@ public class AuthLogic : IAuthLogic
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
 
-        user.LastLoginAt = DateTime.UtcNow;
+        await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
+
+        user.ActiveSessionId = Guid.NewGuid().ToString("N");
+        user.LastLoginAt     = DateTime.UtcNow;
 
         var accessToken = GenerateAccessToken(user);
         var refreshToken = GenerateRefreshToken(user.Id, ipAddress);
 
         _context.RefreshTokens.Add(refreshToken);
         await _context.SaveChangesAsync();
+
+        _cache.Remove($"sess_{user.Id}");
 
         return await BuildLoginResponseAsync(accessToken, refreshToken, user);
     }
@@ -106,7 +119,7 @@ public class AuthLogic : IAuthLogic
             .Include(rt => rt.User)
             .FirstOrDefaultAsync(rt => rt.Token == token);
 
-        if (refreshToken is null || !refreshToken.IsActive)
+        if (refreshToken is null || !refreshToken.IsActive || refreshToken.User is null)
             throw new UnauthorizedAccessException("Token de refresco inválido o expirado");
 
         // Rotate: revoke old, create new
@@ -172,24 +185,27 @@ public class AuthLogic : IAuthLogic
         if (userInfo is null || string.IsNullOrEmpty(userInfo.Email))
             throw new UnauthorizedAccessException("Token de Google no contiene información de usuario");
 
-        ValidateDomain(userInfo.Email);
-
-        // Buscar usuario existente — NO crear automaticamente
+        // Buscar usuario existente — NO crear automáticamente
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email.ToLower() == userInfo.Email.Trim().ToLower());
 
         if (user is null)
-            throw new UnauthorizedAccessException("Usuario no autorizado");
+            throw new UnauthorizedAccessException("Usuario no autorizado. Tu cuenta debe estar registrada en la plataforma.");
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
 
-        user.LastLoginAt = DateTime.UtcNow;
+        await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
+
+        user.ActiveSessionId = Guid.NewGuid().ToString("N");
+        user.LastLoginAt     = DateTime.UtcNow;
 
         var accessToken = GenerateAccessToken(user);
         var refreshToken = GenerateRefreshToken(user.Id, ipAddress);
         _context.RefreshTokens.Add(refreshToken);
         await _context.SaveChangesAsync();
+
+        _cache.Remove($"sess_{user.Id}");
 
         return await BuildLoginResponseAsync(accessToken, refreshToken, user);
     }
@@ -216,7 +232,7 @@ public class AuthLogic : IAuthLogic
             var response = await client.GetAsync("https://graph.microsoft.com/v1.0/me");
 
             if (!response.IsSuccessStatusCode)
-                throw new UnauthorizedAccessException("Token de Microsoft invalido o expirado");
+                throw new UnauthorizedAccessException("Token de Microsoft inválido o expirado");
 
             var json = await response.Content.ReadAsStringAsync();
             userInfo = JsonSerializer.Deserialize<MicrosoftUserInfo>(json,
@@ -235,26 +251,29 @@ public class AuthLogic : IAuthLogic
         var email = userInfo?.Mail ?? userInfo?.UserPrincipalName;
 
         if (userInfo is null || string.IsNullOrEmpty(email))
-            throw new UnauthorizedAccessException("Token de Microsoft no contiene informacion de usuario");
+            throw new UnauthorizedAccessException("Token de Microsoft no contiene información de usuario");
 
-        ValidateDomain(email);
-
-        // Buscar usuario existente — NO crear automaticamente
+        // Buscar usuario existente — NO crear automáticamente
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email.ToLower() == email.Trim().ToLower());
 
         if (user is null)
-            throw new UnauthorizedAccessException("Usuario no autorizado");
+            throw new UnauthorizedAccessException("Usuario no autorizado. Tu cuenta debe estar registrada en la plataforma.");
 
         if (!user.IsActive)
-            throw new UnauthorizedAccessException("Tu cuenta esta desactivada. Contacta al administrador.");
+            throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
 
-        user.LastLoginAt = DateTime.UtcNow;
+        await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
+
+        user.ActiveSessionId = Guid.NewGuid().ToString("N");
+        user.LastLoginAt     = DateTime.UtcNow;
 
         var accessToken = GenerateAccessToken(user);
         var refreshToken = GenerateRefreshToken(user.Id, ipAddress);
         _context.RefreshTokens.Add(refreshToken);
         await _context.SaveChangesAsync();
+
+        _cache.Remove($"sess_{user.Id}");
 
         return await BuildLoginResponseAsync(accessToken, refreshToken, user);
     }
@@ -274,10 +293,10 @@ public class AuthLogic : IAuthLogic
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower().Trim());
 
-        // No revelar si el correo existe o no (anti-enumeracion)
+        // No revelar si el correo existe o no (anti-enumeración)
         if (user is null || !user.IsActive)
         {
-            _logger.LogInformation("Solicitud de recuperacion para correo inexistente o inactivo: {Email}", email);
+            _logger.LogInformation("Solicitud de recuperación para correo inexistente o inactivo: {Email}", email);
             return;
         }
 
@@ -294,7 +313,7 @@ public class AuthLogic : IAuthLogic
         _context.PasswordResetTokens.Add(resetToken);
         await _context.SaveChangesAsync();
 
-        // Construir enlace de recuperacion
+        // Construir enlace de recuperación
         var resetLink = $"{frontendBaseUrl.TrimEnd('/')}/restablecer-contrasena?token={Uri.EscapeDataString(resetToken.Token)}";
 
         // Enviar correo
@@ -304,8 +323,8 @@ public class AuthLogic : IAuthLogic
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "No se pudo enviar correo de recuperacion a {Email}", email);
-            // No propagar la excepcion — el endpoint siempre responde igual
+            _logger.LogError(ex, "No se pudo enviar correo de recuperación a {Email}", email);
+            // No propagar la excepción — el endpoint siempre responde igual
         }
     }
 
@@ -322,7 +341,7 @@ public class AuthLogic : IAuthLogic
             {
                 IsValid = false,
                 UserName = string.Empty,
-                Message = "El enlace de recuperacion no es valido."
+                Message = "El enlace de recuperación no es válido."
             };
 
         if (resetToken.IsUsed)
@@ -357,7 +376,7 @@ public class AuthLogic : IAuthLogic
             .FirstOrDefaultAsync(t => t.Token == token);
 
         if (resetToken is null)
-            throw new InvalidOperationException("Token de recuperacion invalido.");
+            throw new InvalidOperationException("Token de recuperación inválido.");
 
         if (resetToken.IsUsed)
             throw new InvalidOperationException("Este enlace ya fue utilizado. Solicita uno nuevo.");
@@ -365,7 +384,7 @@ public class AuthLogic : IAuthLogic
         if (resetToken.IsExpired)
             throw new InvalidOperationException("El enlace ha expirado. Solicita uno nuevo.");
 
-        // Actualizar contrasena
+        // Actualizar contraseña
         resetToken.User.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
         resetToken.User.UpdatedAt = DateTime.UtcNow;
 
@@ -386,10 +405,45 @@ public class AuthLogic : IAuthLogic
         }
 
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Contrasena actualizada exitosamente para usuario {UserId}", resetToken.UserId);
+        _logger.LogInformation("Contraseña actualizada exitosamente para usuario {UserId}", resetToken.UserId);
+    }
+
+    // ─── Change Password ──────────────────────────────────────────────────────
+
+    public async Task ChangePasswordAsync(int userId, string currentPassword, string newPassword)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user is null)
+            throw new InvalidOperationException("Usuario no encontrado.");
+
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+            throw new InvalidOperationException("La contraseña actual es incorrecta.");
+
+        ValidatePasswordStrength(newPassword);
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword, workFactor: 12);
+        user.MustChangePassword = false;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Contraseña cambiada exitosamente para usuario {UserId}", userId);
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────────
+
+    private static void ValidatePasswordStrength(string password)
+    {
+        if (password.Length < 8)
+            throw new InvalidOperationException("La contraseña debe tener al menos 8 caracteres.");
+        if (!password.Any(char.IsUpper))
+            throw new InvalidOperationException("La contraseña debe contener al menos una letra mayúscula.");
+        if (!password.Any(char.IsLower))
+            throw new InvalidOperationException("La contraseña debe contener al menos una letra minúscula.");
+        if (!password.Any(char.IsDigit))
+            throw new InvalidOperationException("La contraseña debe contener al menos un número.");
+        if (!password.Any(c => !char.IsLetterOrDigit(c)))
+            throw new InvalidOperationException("La contraseña debe contener al menos un carácter especial (ej: @, #, !, %).");
+    }
 
     private string GenerateAccessToken(User user)
     {
@@ -404,6 +458,7 @@ public class AuthLogic : IAuthLogic
             new Claim(JwtRegisteredClaimNames.Name, user.Name),
             new Claim(ClaimTypes.Role, user.Role),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim("sid", user.ActiveSessionId ?? ""),
         };
 
         var token = new JwtSecurityToken(
@@ -452,6 +507,21 @@ public class AuthLogic : IAuthLogic
         };
     }
 
+    // Revoca todas las sesiones activas de un usuario al iniciar una nueva sesión
+    private async Task RevokeAllActiveSessionsAsync(int userId, string ipAddress)
+    {
+        var activeSessions = await _context.RefreshTokens
+            .Where(rt => rt.UserId == userId && !rt.IsRevoked && rt.ExpiresAt > DateTime.UtcNow)
+            .ToListAsync();
+
+        foreach (var session in activeSessions)
+        {
+            session.IsRevoked = true;
+            session.RevokedAt = DateTime.UtcNow;
+            session.RevokedByIp = ipAddress;
+        }
+    }
+
     private async Task<LoginResponse> BuildLoginResponseAsync(string accessToken, RefreshToken refreshToken, User user) => new()
     {
         AccessToken = accessToken,
@@ -467,6 +537,7 @@ public class AuthLogic : IAuthLogic
         Name = user.Name,
         Role = user.Role,
         Permissions = await GetPermissionsByRoleAsync(user.Role),
+        MustChangePassword = user.MustChangePassword,
     };
 
     private Task<List<string>> GetPermissionsByRoleAsync(string roleName) =>

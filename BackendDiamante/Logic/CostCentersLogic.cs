@@ -26,6 +26,7 @@ public class CostCentersLogic : ICostCentersLogic
                     .ThenInclude(op => op.Sector)
             .Where(cc => cc.DeletedAt == null)
             .OrderBy(cc => cc.Id)
+            .AsSplitQuery()
             .ToListAsync();
 
         return costCenters.Select(MapToResponse).ToList();
@@ -38,6 +39,7 @@ public class CostCentersLogic : ICostCentersLogic
             .Include(c => c.CostCenterOperators)
                 .ThenInclude(cco => cco.Operator)
                     .ThenInclude(op => op.Sector)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == id && c.DeletedAt == null);
 
         return cc is null ? null : MapToResponse(cc);

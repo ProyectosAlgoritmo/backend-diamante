@@ -7,4 +7,5 @@ public class UserInfoResponse
     public string Name { get; set; } = null!;
     public string Role { get; set; } = null!;
     public List<string> Permissions { get; set; } = [];
+    public bool MustChangePassword { get; set; }
 }

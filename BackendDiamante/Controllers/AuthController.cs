@@ -95,7 +95,7 @@ public class AuthController : ControllerBase
     {
         return StatusCode(StatusCodes.Status501NotImplemented, new
         {
-            message = $"Login con {provider} no esta disponible aun. Proximamente."
+            message = $"Login con {provider} no está disponible aún. Próximamente."
         });
     }
 
@@ -110,10 +110,10 @@ public class AuthController : ControllerBase
 
         await _authLogic.ForgotPasswordAsync(request.Email, frontendUrl);
 
-        // Siempre responder igual — anti-enumeracion de usuarios
+        // Siempre responder igual — anti-enumeración de usuarios
         return Ok(new
         {
-            message = "Si el correo existe en nuestro sistema, recibiras un enlace de recuperacion."
+            message = "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación."
         });
     }
 
@@ -136,7 +136,22 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         await _authLogic.ResetPasswordAsync(request.Token, request.NewPassword);
-        return Ok(new { message = "Contrasena actualizada exitosamente." });
+        return Ok(new { message = "Contraseña actualizada exitosamente." });
+    }
+
+    // POST api/auth/change-password (requiere JWT válido)
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                     ?? User.FindFirstValue("sub");
+
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { message = "Token inválido" });
+
+        await _authLogic.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
+        return Ok(new { message = "Contraseña actualizada exitosamente." });
     }
 
     // ─── Helper ───────────────────────────────────────────────────────────────
