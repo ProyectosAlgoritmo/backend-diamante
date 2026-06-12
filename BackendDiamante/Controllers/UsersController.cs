@@ -48,6 +48,15 @@ public class UsersController : BaseController
         return Success(user);
     }
 
+    /// <summary>Roles activos asignables al crear o editar un usuario</summary>
+    [HttpGet("assignable-roles")]
+    [Authorize(Roles = "admin,Administrador")]
+    public async Task<IActionResult> GetAssignableRoles()
+    {
+        var roles = await _usersLogic.GetAssignableRolesAsync();
+        return Success(roles);
+    }
+
     /// <summary>Crear un nuevo usuario (solo admin)</summary>
     [HttpPost]
     [Authorize(Roles = "admin,Administrador")]

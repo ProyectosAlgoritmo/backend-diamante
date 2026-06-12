@@ -10,4 +10,5 @@ public interface IUsersLogic
     Task<UserResponse?> UpdateAsync(int id, UpdateUserRequest request);
     Task<bool> DeleteAsync(int id, int currentUserId);
     Task<UserStatsResponse> GetStatsAsync();
+    Task<List<AssignableRoleResponse>> GetAssignableRolesAsync();
 }

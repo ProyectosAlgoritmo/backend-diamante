@@ -236,6 +236,15 @@ public class UsersLogic : IUsersLogic
         };
     }
 
+    public async Task<List<AssignableRoleResponse>> GetAssignableRolesAsync()
+    {
+        return await _context.Roles
+            .Where(r => r.IsActive && r.DeletedAt == null)
+            .OrderBy(r => r.Name)
+            .Select(r => new AssignableRoleResponse(r.Id, r.Name))
+            .ToListAsync();
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static string? SerializeCertificates(List<string>? certs)
