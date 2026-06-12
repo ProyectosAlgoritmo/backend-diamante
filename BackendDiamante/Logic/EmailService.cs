@@ -288,8 +288,9 @@ public class EmailService : IEmailService
                       </tr>
                       <tr>
                         <td style=""padding-top:16px;"">
-                          <p style=""color:#6b7280; font-size:12px; margin:0 0 4px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600;"">Contraseña</p>
-                          <p style=""color:#1a1a2e; font-size:16px; margin:0; font-weight:600; font-family:'Courier New',monospace;"">{password}</p>
+                          <p style=""color:#6b7280; font-size:12px; margin:0 0 4px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600;"">Contraseña inicial</p>
+                          <p style=""color:#1a1a2e; font-size:16px; margin:0 4px 0; font-weight:600; font-family:'Courier New',monospace;"">{password}</p>
+                          <p style=""color:#6b7280; font-size:11px; margin:0;"">Los primeros 4 dígitos de tu documento de identidad</p>
                         </td>
                       </tr>
                     </table>
