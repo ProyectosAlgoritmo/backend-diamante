@@ -295,9 +295,6 @@ public class UsersLogic : IUsersLogic
         var user = await _context.Users.FindAsync(id);
         if (user is null) return false;
 
-        if (IsProtectedUser(user))
-            throw new InvalidOperationException("No es posible eliminar un usuario administrador.");
-
         _context.Users.Remove(user);
         await _context.SaveChangesAsync();
 
