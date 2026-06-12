@@ -10,7 +10,7 @@ public class LoginRequest
     public string Email { get; set; } = null!;
 
     [Required(ErrorMessage = "La contraseña es requerida")]
-    [MinLength(6, ErrorMessage = "La contraseña debe tener al menos 6 caracteres")]
+    [MinLength(4, ErrorMessage = "La contraseña debe tener al menos 4 caracteres")]
     [MaxLength(100)]
     public string Password { get; set; } = null!;
 
