@@ -91,6 +91,8 @@ public class AuthLogic : IAuthLogic
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
 
+        await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
+
         user.LastLoginAt = DateTime.UtcNow;
 
         var accessToken = GenerateAccessToken(user);
@@ -186,6 +188,8 @@ public class AuthLogic : IAuthLogic
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
 
+        await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
+
         user.LastLoginAt = DateTime.UtcNow;
 
         var accessToken = GenerateAccessToken(user);
@@ -248,6 +252,8 @@ public class AuthLogic : IAuthLogic
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
+
+        await RevokeAllActiveSessionsAsync(user.Id, ipAddress);
 
         user.LastLoginAt = DateTime.UtcNow;
 
@@ -485,6 +491,21 @@ public class AuthLogic : IAuthLogic
             ExpiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes),
             UserId    = userId,
         };
+    }
+
+    // Revoca todas las sesiones activas de un usuario al iniciar una nueva sesión
+    private async Task RevokeAllActiveSessionsAsync(int userId, string ipAddress)
+    {
+        var activeSessions = await _context.RefreshTokens
+            .Where(rt => rt.UserId == userId && !rt.IsRevoked && rt.ExpiresAt > DateTime.UtcNow)
+            .ToListAsync();
+
+        foreach (var session in activeSessions)
+        {
+            session.IsRevoked = true;
+            session.RevokedAt = DateTime.UtcNow;
+            session.RevokedByIp = ipAddress;
+        }
     }
 
     private async Task<LoginResponse> BuildLoginResponseAsync(string accessToken, RefreshToken refreshToken, User user) => new()
