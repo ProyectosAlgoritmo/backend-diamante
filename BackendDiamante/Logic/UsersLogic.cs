@@ -14,7 +14,7 @@ public class UsersLogic : IUsersLogic
     private readonly ILogger<UsersLogic> _logger;
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
-    /// <summary>Roles protegidos que no se pueden asignar, editar ni eliminar desde el modulo Usuarios.</summary>
+    /// <summary>Roles protegidos que no se pueden asignar, editar ni eliminar desde el módulo Usuarios.</summary>
     private static readonly HashSet<string> ProtectedRoles = new(StringComparer.OrdinalIgnoreCase)
     {
         "admin",
@@ -60,14 +60,14 @@ public class UsersLogic : IUsersLogic
     // ── CREATE ────────────────────────────────────────────────────────────────
     public async Task<UserResponse> CreateAsync(CreateUserRequest request)
     {
-        // Validar email unico
+        // Validar email único
         var emailExists = await _context.Users
             .AnyAsync(u => u.Email.ToLower() == request.Email.Trim().ToLower());
 
         if (emailExists)
-            throw new InvalidOperationException("Ya existe un usuario con ese correo electronico.");
+            throw new InvalidOperationException("Ya existe un usuario con ese correo electrónico.");
 
-        // Validar username unico (si viene)
+        // Validar username único (si viene)
         if (!string.IsNullOrWhiteSpace(request.Username))
         {
             var usernameExists = await _context.Users
@@ -77,7 +77,7 @@ public class UsersLogic : IUsersLogic
                 throw new InvalidOperationException("Ya existe un usuario con ese nombre de usuario.");
         }
 
-        // Validar documentId unico (si viene)
+        // Validar documentId único (si viene)
         if (!string.IsNullOrWhiteSpace(request.DocumentId))
         {
             var docExists = await _context.Users
@@ -89,10 +89,10 @@ public class UsersLogic : IUsersLogic
 
         var status = request.Status ?? "Activo";
 
-        // La cedula se usa como contrasena inicial
+        // La cédula se usa como contraseña inicial
         var password = !string.IsNullOrWhiteSpace(request.DocumentId)
             ? request.DocumentId.Trim()
-            : "Diamante2026!"; // Contrasena por defecto si no hay cedula
+            : "Diamante2026!"; // Contraseña por defecto si no hay cédula
 
         var user = new User
         {
@@ -139,17 +139,17 @@ public class UsersLogic : IUsersLogic
         var user = await _context.Users.FindAsync(id);
         if (user is null) return null;
 
-        // Validar email unico (si cambia)
+        // Validar email único (si cambia)
         if (request.Email is not null)
         {
             var emailExists = await _context.Users
                 .AnyAsync(u => u.Id != id && u.Email.ToLower() == request.Email.Trim().ToLower());
 
             if (emailExists)
-                throw new InvalidOperationException("Ya existe un usuario con ese correo electronico.");
+                throw new InvalidOperationException("Ya existe un usuario con ese correo electrónico.");
         }
 
-        // Validar username unico (si cambia)
+        // Validar username único (si cambia)
         if (request.Username is not null && !string.IsNullOrWhiteSpace(request.Username))
         {
             var usernameExists = await _context.Users
@@ -188,7 +188,7 @@ public class UsersLogic : IUsersLogic
         return MapToResponse(user);
     }
 
-    // ── DELETE (bloquea eliminacion de admin y auto-eliminacion) ────────────
+    // ── DELETE (bloquea eliminación de admin y auto-eliminación) ────────────
     public async Task<bool> DeleteAsync(int id, int currentUserId)
     {
         if (id == currentUserId)
@@ -197,7 +197,7 @@ public class UsersLogic : IUsersLogic
         var user = await _context.Users.FindAsync(id);
         if (user is null) return false;
 
-        // Bloquear eliminacion de usuarios con rol protegido
+        // Bloquear eliminación de usuarios con rol protegido
         if (IsProtectedUser(user))
             throw new InvalidOperationException("No es posible eliminar un usuario administrador.");
 

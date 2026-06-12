@@ -67,7 +67,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 var body = JsonSerializer.Serialize(new
                 {
                     success = false,
-                    message = "Tu sesion no es valida o expiro."
+                    message = "Tu sesión no es válida o expiró."
                 });
 
                 await context.Response.WriteAsync(body);
@@ -80,7 +80,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 var body = JsonSerializer.Serialize(new
                 {
                     success = false,
-                    message = "No tienes permisos para realizar esta accion."
+                    message = "No tienes permisos para realizar esta acción."
                 });
 
                 await context.Response.WriteAsync(body);

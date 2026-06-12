@@ -10,7 +10,7 @@ public class UpdateUserRequest
     [StringLength(100)]
     public string? LastName { get; set; }
 
-    [EmailAddress(ErrorMessage = "El correo no es valido")]
+    [EmailAddress(ErrorMessage = "El correo no es válido")]
     [StringLength(200)]
     public string? Email { get; set; }
 

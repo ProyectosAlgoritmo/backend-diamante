@@ -29,7 +29,7 @@ public class EmailService : IEmailService
         using var message = new MailMessage
         {
             From       = new MailAddress(fromEmail, fromName),
-            Subject    = "Recuperacion de contrasena - Diamante",
+            Subject    = "Recuperación de contraseña - Diamante",
             Body       = htmlBody,
             IsBodyHtml = true,
         };
@@ -45,11 +45,11 @@ public class EmailService : IEmailService
         try
         {
             await client.SendMailAsync(message);
-            _logger.LogInformation("Correo de recuperacion enviado a {Email}", toEmail);
+            _logger.LogInformation("Correo de recuperación enviado a {Email}", toEmail);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error enviando correo de recuperacion a {Email}", toEmail);
+            _logger.LogError(ex, "Error enviando correo de recuperación a {Email}", toEmail);
             throw;
         }
     }
@@ -106,7 +106,7 @@ public class EmailService : IEmailService
 <head>
   <meta charset=""UTF-8"" />
   <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" />
-  <title>Recuperacion de contrasena</title>
+  <title>Recuperación de contraseña</title>
 </head>
 <body style=""margin:0; padding:0; background-color:#f4f6f9; font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;"">
   <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" style=""background-color:#f4f6f9; padding:40px 0;"">
@@ -145,8 +145,8 @@ public class EmailService : IEmailService
 
               <h1 style=""color:#1a1a2e; font-size:22px; font-weight:700; margin:20px 0 8px;"">Hola {firstName}</h1>
               <p style=""color:#4a5568; font-size:15px; line-height:1.7; margin:0 0 24px;"">
-                Recibimos una solicitud para restablecer la contrasena de tu cuenta.
-                Si realizaste esta solicitud, haz clic en el boton de abajo para continuar.
+                Recibimos una solicitud para restablecer la contraseña de tu cuenta.
+                Si realizaste esta solicitud, haz clic en el botón de abajo para continuar.
               </p>
 
               <!-- CTA Button -->
@@ -155,12 +155,12 @@ public class EmailService : IEmailService
                   <td align=""center"" style=""padding:8px 0 28px;"">
                     <!--[if mso]>
                     <v:roundrect xmlns:v=""urn:schemas-microsoft-com:vml"" href=""{resetLink}"" style=""height:48px;v-text-anchor:middle;width:280px;"" arcsize=""17%"" strokecolor=""#1c3fac"" fillcolor=""#1c3fac"">
-                    <center style=""color:#ffffff;font-family:'Segoe UI',sans-serif;font-size:15px;font-weight:600;"">Restablecer contrasena</center>
+                    <center style=""color:#ffffff;font-family:'Segoe UI',sans-serif;font-size:15px;font-weight:600;"">Restablecer contraseña</center>
                     </v:roundrect>
                     <![endif]-->
                     <!--[if !mso]><!-->
                     <a href=""{resetLink}"" target=""_blank"" style=""display:inline-block; background:#1c3fac; color:#ffffff; text-decoration:none; font-size:15px; font-weight:600; padding:14px 40px; border-radius:8px; letter-spacing:0.3px;"">
-                      Restablecer contrasena
+                      Restablecer contraseña
                     </a>
                     <!--<![endif]-->
                   </td>
@@ -169,7 +169,7 @@ public class EmailService : IEmailService
 
               <!-- Fallback link -->
               <p style=""color:#6b7280; font-size:13px; line-height:1.6; margin:0 0 8px;"">
-                Si el boton no funciona, copia y pega este enlace en tu navegador:
+                Si el botón no funciona, copia y pega este enlace en tu navegador:
               </p>
               <p style=""color:#1c3fac; font-size:12px; word-break:break-all; margin:0 0 28px; padding:12px 16px; background:#f8fafc; border-radius:6px; border:1px solid #e8e8e8;"">
                 {resetLink}
@@ -193,7 +193,7 @@ public class EmailService : IEmailService
           <tr>
             <td style=""padding:0 40px 36px;"">
               <p style=""color:#9ca3af; font-size:12px; line-height:1.6; margin:20px 0 0;"">
-                Si no solicitaste este cambio, ignora este correo. Tu contrasena no sera modificada y tu cuenta permanecera segura.
+                Si no solicitaste este cambio, ignora este correo. Tu contraseña no será modificada y tu cuenta permanecerá segura.
               </p>
             </td>
           </tr>
@@ -203,7 +203,7 @@ public class EmailService : IEmailService
             <td style=""background:#f8fafc; padding:20px 40px; border-top:1px solid #e8e8e8; text-align:center;"">
               <p style=""color:#9ca3af; font-size:11px; margin:0; line-height:1.5;"">
                 &copy; {DateTime.UtcNow.Year} Diamante &mdash; Limpieza Inteligente<br/>
-                Este es un correo automatico, por favor no respondas a este mensaje.
+                Este es un correo automático, por favor no respondas a este mensaje.
               </p>
             </td>
           </tr>
@@ -266,7 +266,7 @@ public class EmailService : IEmailService
               <h1 style=""color:#1a1a2e; font-size:22px; font-weight:700; margin:20px 0 8px;"">Bienvenido, {firstName}</h1>
               <p style=""color:#4a5568; font-size:15px; line-height:1.7; margin:0 0 24px;"">
                 Tu cuenta ha sido creada exitosamente en la plataforma <strong>Diamante</strong>.
-                A continuacion encontraras tus credenciales de acceso para iniciar sesion.
+                A continuación encontrarás tus credenciales de acceso para iniciar sesión.
               </p>
 
               <!-- Credentials Card -->
@@ -288,7 +288,7 @@ public class EmailService : IEmailService
                       </tr>
                       <tr>
                         <td style=""padding-top:16px;"">
-                          <p style=""color:#6b7280; font-size:12px; margin:0 0 4px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600;"">Contrasena</p>
+                          <p style=""color:#6b7280; font-size:12px; margin:0 0 4px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600;"">Contraseña</p>
                           <p style=""color:#1a1a2e; font-size:16px; margin:0; font-weight:600; font-family:'Courier New',monospace;"">{password}</p>
                         </td>
                       </tr>
@@ -302,7 +302,7 @@ public class EmailService : IEmailService
                 <tr>
                   <td style=""padding:16px; background:#fef3c7; border-radius:8px; border-left:4px solid #f59e0b;"">
                     <p style=""color:#92400e; font-size:13px; margin:0; line-height:1.5;"">
-                      <strong>&#128272; Importante:</strong> Al iniciar sesion por primera vez, el sistema te pedira cambiar tu contrasena por una nueva.
+                      <strong>&#128272; Importante:</strong> Al iniciar sesión por primera vez, el sistema te pedirá cambiar tu contraseña por una nueva.
                     </p>
                   </td>
                 </tr>
@@ -324,7 +324,7 @@ public class EmailService : IEmailService
             <td style=""background:#f8fafc; padding:20px 40px; border-top:1px solid #e8e8e8; text-align:center;"">
               <p style=""color:#9ca3af; font-size:11px; margin:0; line-height:1.5;"">
                 &copy; {DateTime.UtcNow.Year} Diamante &mdash; Limpieza Inteligente<br/>
-                Este es un correo automatico, por favor no respondas a este mensaje.
+                Este es un correo automático, por favor no respondas a este mensaje.
               </p>
             </td>
           </tr>

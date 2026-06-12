@@ -4,7 +4,7 @@ namespace BackendDiamante.Models.DTOs.Auth;
 
 public class LoginRequest
 {
-    /// <summary>Correo electronico o nombre de usuario.</summary>
+    /// <summary>Correo electrónico o nombre de usuario.</summary>
     [Required(ErrorMessage = "El correo o usuario es requerido")]
     [MaxLength(200)]
     public string Email { get; set; } = null!;

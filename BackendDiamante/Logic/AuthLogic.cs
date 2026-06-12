@@ -36,11 +36,11 @@ public class AuthLogic : IAuthLogic
         _logger = logger;
     }
 
-    // ─── Validacion de dominio empresarial ──────────────────────────────────
+    // ─── Validación de dominio empresarial ──────────────────────────────────
     private void ValidateDomain(string email)
     {
         var allowedDomain = _config["Auth:AllowedDomain"];
-        if (string.IsNullOrEmpty(allowedDomain)) return; // Si no esta configurado, no restringir
+        if (string.IsNullOrEmpty(allowedDomain)) return; // Si no está configurado, no restringir
 
         var domain = email.Trim().ToLower().Split('@').LastOrDefault();
         if (!string.Equals(domain, allowedDomain.Trim().ToLower(), StringComparison.Ordinal))
@@ -168,7 +168,7 @@ public class AuthLogic : IAuthLogic
         if (userInfo is null || string.IsNullOrEmpty(userInfo.Email))
             throw new UnauthorizedAccessException("Token de Google no contiene información de usuario");
 
-        // Buscar usuario existente — NO crear automaticamente
+        // Buscar usuario existente — NO crear automáticamente
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email.ToLower() == userInfo.Email.Trim().ToLower());
 
@@ -210,7 +210,7 @@ public class AuthLogic : IAuthLogic
             var response = await client.GetAsync("https://graph.microsoft.com/v1.0/me");
 
             if (!response.IsSuccessStatusCode)
-                throw new UnauthorizedAccessException("Token de Microsoft invalido o expirado");
+                throw new UnauthorizedAccessException("Token de Microsoft inválido o expirado");
 
             var json = await response.Content.ReadAsStringAsync();
             userInfo = JsonSerializer.Deserialize<MicrosoftUserInfo>(json,
@@ -229,9 +229,9 @@ public class AuthLogic : IAuthLogic
         var email = userInfo?.Mail ?? userInfo?.UserPrincipalName;
 
         if (userInfo is null || string.IsNullOrEmpty(email))
-            throw new UnauthorizedAccessException("Token de Microsoft no contiene informacion de usuario");
+            throw new UnauthorizedAccessException("Token de Microsoft no contiene información de usuario");
 
-        // Buscar usuario existente — NO crear automaticamente
+        // Buscar usuario existente — NO crear automáticamente
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email.ToLower() == email.Trim().ToLower());
 
@@ -239,7 +239,7 @@ public class AuthLogic : IAuthLogic
             throw new UnauthorizedAccessException("Usuario no autorizado. Tu cuenta debe estar registrada en la plataforma.");
 
         if (!user.IsActive)
-            throw new UnauthorizedAccessException("Tu cuenta esta desactivada. Contacta al administrador.");
+            throw new UnauthorizedAccessException("Tu cuenta está desactivada. Contacta al administrador.");
 
         user.LastLoginAt = DateTime.UtcNow;
 
@@ -266,10 +266,10 @@ public class AuthLogic : IAuthLogic
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower().Trim());
 
-        // No revelar si el correo existe o no (anti-enumeracion)
+        // No revelar si el correo existe o no (anti-enumeración)
         if (user is null || !user.IsActive)
         {
-            _logger.LogInformation("Solicitud de recuperacion para correo inexistente o inactivo: {Email}", email);
+            _logger.LogInformation("Solicitud de recuperación para correo inexistente o inactivo: {Email}", email);
             return;
         }
 
@@ -286,7 +286,7 @@ public class AuthLogic : IAuthLogic
         _context.PasswordResetTokens.Add(resetToken);
         await _context.SaveChangesAsync();
 
-        // Construir enlace de recuperacion
+        // Construir enlace de recuperación
         var resetLink = $"{frontendBaseUrl.TrimEnd('/')}/restablecer-contrasena?token={Uri.EscapeDataString(resetToken.Token)}";
 
         // Enviar correo
@@ -296,8 +296,8 @@ public class AuthLogic : IAuthLogic
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "No se pudo enviar correo de recuperacion a {Email}", email);
-            // No propagar la excepcion — el endpoint siempre responde igual
+            _logger.LogError(ex, "No se pudo enviar correo de recuperación a {Email}", email);
+            // No propagar la excepción — el endpoint siempre responde igual
         }
     }
 
@@ -314,7 +314,7 @@ public class AuthLogic : IAuthLogic
             {
                 IsValid = false,
                 UserName = string.Empty,
-                Message = "El enlace de recuperacion no es valido."
+                Message = "El enlace de recuperación no es válido."
             };
 
         if (resetToken.IsUsed)
@@ -349,7 +349,7 @@ public class AuthLogic : IAuthLogic
             .FirstOrDefaultAsync(t => t.Token == token);
 
         if (resetToken is null)
-            throw new InvalidOperationException("Token de recuperacion invalido.");
+            throw new InvalidOperationException("Token de recuperación inválido.");
 
         if (resetToken.IsUsed)
             throw new InvalidOperationException("Este enlace ya fue utilizado. Solicita uno nuevo.");
@@ -357,7 +357,7 @@ public class AuthLogic : IAuthLogic
         if (resetToken.IsExpired)
             throw new InvalidOperationException("El enlace ha expirado. Solicita uno nuevo.");
 
-        // Actualizar contrasena
+        // Actualizar contraseña
         resetToken.User.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
         resetToken.User.UpdatedAt = DateTime.UtcNow;
 
@@ -378,7 +378,7 @@ public class AuthLogic : IAuthLogic
         }
 
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Contrasena actualizada exitosamente para usuario {UserId}", resetToken.UserId);
+        _logger.LogInformation("Contraseña actualizada exitosamente para usuario {UserId}", resetToken.UserId);
     }
 
     // ─── Change Password ──────────────────────────────────────────────────────
@@ -390,14 +390,14 @@ public class AuthLogic : IAuthLogic
             throw new InvalidOperationException("Usuario no encontrado.");
 
         if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
-            throw new InvalidOperationException("La contrasena actual es incorrecta.");
+            throw new InvalidOperationException("La contraseña actual es incorrecta.");
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword, workFactor: 12);
         user.MustChangePassword = false;
         user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Contrasena cambiada exitosamente para usuario {UserId}", userId);
+        _logger.LogInformation("Contraseña cambiada exitosamente para usuario {UserId}", userId);
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────────
