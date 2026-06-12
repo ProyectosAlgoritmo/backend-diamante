@@ -392,6 +392,8 @@ public class AuthLogic : IAuthLogic
         if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
             throw new InvalidOperationException("La contraseña actual es incorrecta.");
 
+        ValidatePasswordStrength(newPassword);
+
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword, workFactor: 12);
         user.MustChangePassword = false;
         user.UpdatedAt = DateTime.UtcNow;
@@ -401,6 +403,20 @@ public class AuthLogic : IAuthLogic
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────────
+
+    private static void ValidatePasswordStrength(string password)
+    {
+        if (password.Length < 8)
+            throw new InvalidOperationException("La contraseña debe tener al menos 8 caracteres.");
+        if (!password.Any(char.IsUpper))
+            throw new InvalidOperationException("La contraseña debe contener al menos una letra mayúscula.");
+        if (!password.Any(char.IsLower))
+            throw new InvalidOperationException("La contraseña debe contener al menos una letra minúscula.");
+        if (!password.Any(char.IsDigit))
+            throw new InvalidOperationException("La contraseña debe contener al menos un número.");
+        if (!password.Any(c => !char.IsLetterOrDigit(c)))
+            throw new InvalidOperationException("La contraseña debe contener al menos un carácter especial (ej: @, #, !, %).");
+    }
 
     private string GenerateAccessToken(User user)
     {

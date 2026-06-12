@@ -85,9 +85,11 @@ public class UsersLogic : IUsersLogic
 
         var status = request.Status ?? "Activo";
 
-        var password = !string.IsNullOrWhiteSpace(request.DocumentId)
-            ? request.DocumentId.Trim()
-            : "Diamante2026!";
+        // Los primeros 4 dígitos de la cédula son la contraseña inicial
+        var docDigits = string.IsNullOrWhiteSpace(request.DocumentId)
+            ? ""
+            : new string(request.DocumentId.Trim().Where(char.IsDigit).Take(4).ToArray());
+        var password = docDigits.Length >= 4 ? docDigits : "Diam2026!";
 
         var user = new User
         {
