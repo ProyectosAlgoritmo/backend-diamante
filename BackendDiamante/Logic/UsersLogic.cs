@@ -59,11 +59,13 @@ public class UsersLogic : IUsersLogic
     // ── CREATE ────────────────────────────────────────────────────────────────
     public async Task<UserResponse> CreateAsync(CreateUserRequest request)
     {
-        // La cédula es el identificador único: no puede repetirse entre usuarios
+        // La cédula es el identificador único entre usuarios regulares (se excluyen roles protegidos)
         if (!string.IsNullOrWhiteSpace(request.DocumentId))
         {
             var existingByDoc = await _context.Users
-                .FirstOrDefaultAsync(u => u.DocumentId != null && u.DocumentId == request.DocumentId.Trim());
+                .FirstOrDefaultAsync(u => u.DocumentId != null
+                    && u.DocumentId == request.DocumentId.Trim()
+                    && !ProtectedRoles.Contains(u.Role));
 
             if (existingByDoc is not null)
             {
